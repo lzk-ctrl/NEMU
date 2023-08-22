@@ -46,8 +46,8 @@ char regname[8][4]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
 static int cmd_info(char *args){
 	if(strcmp(args,"r")==0){
 		for(int i=0;i<8;i++)
-		printf("%s\t%#x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
-        printf("%s\t%#x\t%d\n","eip",cpu.eip,cpu.eip);
+		printf("%s\t%8x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
+        printf("%s\t%8x\t%d\n","eip",cpu.eip,cpu.eip);
 	}
 	return 0;
 }
