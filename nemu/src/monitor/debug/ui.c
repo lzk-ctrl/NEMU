@@ -42,7 +42,7 @@ static int cmd_si(char *args){
 	cpu_exec(n);
 	return 0;
 }
-char regname[][3]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
+char regname[8][3]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
 static int cmd_info(char *args){
 	if(strcmp(args,"r")==0){
 		for(int i=0;i<8;i++)
