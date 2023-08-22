@@ -57,7 +57,7 @@ static int cmd_x(char *args){
 	for(int i=0;i<n;i++){
 		if(i%4==0)
 		printf("%8x:",addr+i*4);
-		printf(" %8x",swaddr_read(addr+i*4,32));
+		printf(" %8x",swaddr_read(addr+i*4,4));
 		if(i%4==3)
 		printf("\n");
 	}
