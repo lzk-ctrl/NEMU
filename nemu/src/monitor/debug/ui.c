@@ -46,8 +46,8 @@ char regname[8][4]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
 static int cmd_info(char *args){
 	if(strcmp(args,"r")==0){
 		for(int i=0;i<8;i++)
-		printf("%s\t%#8x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
-        printf("%s\t%#8x\t%d\n","eip",cpu.eip,cpu.eip);
+		printf("%s\t%#08x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
+        printf("%s\t%#08x\t%d\n","eip",cpu.eip,cpu.eip);
 	}
 	return 0;
 }
@@ -56,8 +56,8 @@ static int cmd_x(char *args){
 	sscanf(args,"%d %x",&n,&addr);
 	for(int i=0;i<n;i++){
 		if(i%4==0)
-		printf("%#8x:",addr+i*4);
-		printf(" %#8x",swaddr_read(addr+i*4,4));
+		printf("%#08x:",addr+i*4);
+		printf(" %#08x",swaddr_read(addr+i*4,4));
 		if(i%4==3||i==n-1)
 		printf("\n");
 	}
