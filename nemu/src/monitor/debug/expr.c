@@ -1,16 +1,17 @@
 #include "nemu.h"
-#include <stdlib.h>
+
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <sys/types.h>
 #include <regex.h>
+#include <stdlib.h>
 
 enum {
-	NOTYPE = 256, EQ,
+	NOTYPE = 256, EQ
 
 	/* TODO: Add more token types */
-	NUM,REG,OR,NEQ,AND,REF,NEG
+        , NUM, NEQ, OR, AND, REG, REF, NEG
 };
 
 static struct rule {
@@ -25,19 +26,19 @@ static struct rule {
 	{" +",	NOTYPE},				// spaces
 	{"\\+", '+'},					// plus
 	{"==", EQ},						// equal
-    {"\\|\\|", OR},
-	{"!=", NEQ},   
-    {"\\*",'*'},
-	{"/", '/'}, 
-	{"-",'-'},
+	{"0x[0-9a-fA-F]{1,8}", NUM},			// hex
+	{"[0-9]{1,10}", NUM},					// dec
+	{"\\$[a-z]{1,31}", REG},				// register names 
+	{"-", '-'},
+	{"\\*", '*'},
+	{"/", '/'},
+	{"%", '%'},
+	{"!=", NEQ},
 	{"&&", AND},
-	{"0x[0-9a-fA-F]{1,8}", NUM},
-	{"[0-9]{1,10}", NUM},
+	{"\\|\\|", OR},
 	{"!", '!'},
 	{"\\(", '('},
-	{"\\)", ')'},
-	{"\\$[a-z]{1,31}", REG},
-	{"%",'%'}
+	{"\\)", ')'} 
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -92,12 +93,12 @@ static bool make_token(char *e) {
 				 */
 
 				switch(rules[i].token_type) {
-					case NOTYPE: break;
-					case REG:
-					case NUM: sprintf(tokens[nr_token].str, "%.*s", substr_len, substr_start);
-					default:tokens[nr_token].type=rules[i].token_type;
-					nr_token++;
-					break;
+                                        case NOTYPE: break;
+                                        case NUM:
+					//default: panic("please implement me");
+                                        case REG: sprintf(tokens[nr_token].str, "%.*s", substr_len, substr_start);
+					default: tokens[nr_token].type = rules[i].token_type;
+							 nr_token ++;
 				}
 
 				break;
@@ -112,6 +113,9 @@ static bool make_token(char *e) {
 
 	return true; 
 }
+
+/*TODO: Expression evaluation*/
+
 static int op_prec(int t) {
 	switch(t) {
 		case '!': case NEG: case REF: return 0;
@@ -123,8 +127,9 @@ static int op_prec(int t) {
 		default: assert(0);
 	}
 }
-static inline int op_prec_cmp(int t1,int t2){
-	return op_prec(t1)-op_prec(t2);
+
+static inline int op_prec_cmp(int t1, int t2) {
+	return op_prec(t1) - op_prec(t2);
 }
 
 static int find_dominated_op(int s, int e, bool *success) {
@@ -164,7 +169,9 @@ static int find_dominated_op(int s, int e, bool *success) {
 	*success = (dominated_op != -1);
 	return dominated_op;
 }
+
 uint32_t get_reg_val(const char*, bool *);
+
 static uint32_t eval(int s, int e, bool *success) {
 	if(s > e) {
 		// bad expression
@@ -227,6 +234,8 @@ static uint32_t eval(int s, int e, bool *success) {
 	}
 }
 
+/* TODO: Expression evaluation end */
+
 uint32_t expr(char *e, bool *success) {
 	if(!make_token(e)) {
 		*success = false;
@@ -234,7 +243,10 @@ uint32_t expr(char *e, bool *success) {
 	}
 
 	/* TODO: Insert codes to evaluate the expression. */
-int i;
+       	//panic("please implement me");
+	//return 0;
+        /* Detect REF and NEG tokens */
+	int i;
 	int prev_type;
 	for(i = 0; i < nr_token; i ++) {
 		if(tokens[i].type == '-') {
