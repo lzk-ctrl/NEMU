@@ -63,6 +63,17 @@ static int cmd_x(char *args){
 	}
 	return 0;
 }
+
+static int cmd_p(char *args) {
+	bool success;
+
+	if(args) {
+		uint32_t r = expr(args, &success);
+		if(success) { printf("0x%08x(%d)\n", r, r); }
+		else { printf("Bad expression\n"); }
+	}
+	return 0;
+}
 static int cmd_help(char *args);
 
 static struct {
@@ -75,7 +86,8 @@ static struct {
 	{ "q", "Exit NEMU", cmd_q },
 	{ "si", "single take",cmd_si},
 	{ "info","print reg",cmd_info},
-	{ "x","print memory",cmd_x}
+	{ "x","print memory",cmd_x},
+	{"p","calculate",cmd_p}
 
 	/* TODO: Add more commands */
 
@@ -105,6 +117,7 @@ static int cmd_help(char *args) {
 	}
 	return 0;
 }
+
 
 void ui_mainloop() {
 	while(1) {
