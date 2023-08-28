@@ -52,12 +52,14 @@ static int cmd_info(char *args){
 	return 0;
 }
 static int cmd_x(char *args){
-	int n, addr;
-	sscanf(args,"%d %x",&n,&addr);
+	int n,addr;
+	sscanf(args,"%d %d",&n,&addr);
+	bool s;
+	int addrr=expr(args + strlen(args) + 1, &s);
 	for(int i=0;i<n;i++){
 		if(i%4==0)
-		printf("%#010x:",addr+i*4);
-		printf(" %#010x",swaddr_read(addr+i*4,4));
+		printf("%#010x:",addrr+i*4);
+		printf(" %#010x",swaddr_read(addrr+i*4,4));
 		if(i%4==3||i==n-1)
 		printf("\n");
 	}
