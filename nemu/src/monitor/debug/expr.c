@@ -10,7 +10,7 @@ enum {
 	NOTYPE = 256, EQ,
 
 	/* TODO: Add more token types */
-	NUM
+	NUM,REG
 };
 
 static struct rule {
@@ -30,7 +30,9 @@ static struct rule {
 	{"-",'-'},
 	{"\\d+",NUM},
 	{"\\(", '('},
-	{"\\)", ')'}
+	{"\\)", ')'},
+	{"\\$[a-z]{1,31}", REG},
+	{"%",'%'}
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -85,7 +87,10 @@ static bool make_token(char *e) {
 				 */
 
 				switch(rules[i].token_type) {
-					default: panic("please implement me");
+					case NOTYPE: break;
+					default:tokens[nr_token].type=rules[i].token_type;
+					nr_token++;
+					break;
 				}
 
 				break;
