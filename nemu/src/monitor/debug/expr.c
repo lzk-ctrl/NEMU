@@ -88,6 +88,8 @@ static bool make_token(char *e) {
 
 				switch(rules[i].token_type) {
 					case NOTYPE: break;
+					case REG:
+					case NUM: sprintf(tokens[nr_token].str, "%.*s", substr_len, substr_start);
 					default:tokens[nr_token].type=rules[i].token_type;
 					nr_token++;
 					break;
