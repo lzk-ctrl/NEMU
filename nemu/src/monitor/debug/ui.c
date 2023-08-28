@@ -55,7 +55,7 @@ static int cmd_x(char *args){
 	int n,addr;
 	sscanf(args,"%d %d",&n,&addr);
 	bool s;
-	int addrr=expr(args + strlen(args) + 1, &s);
+	uint32_t addrr=expr(args + strlen(args) + 1, &s);
 	for(int i=0;i<n;i++){
 		if(i%4==0)
 		printf("%#010x:",addrr);
