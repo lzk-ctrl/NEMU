@@ -10,84 +10,105 @@
 void cpu_exec(uint32_t);
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
-char* rl_gets() {
+char *rl_gets()
+{
 	static char *line_read = NULL;
 
-	if (line_read) {
+	if (line_read)
+	{
 		free(line_read);
 		line_read = NULL;
 	}
 
 	line_read = readline("(nemu) ");
 
-	if (line_read && *line_read) {
+	if (line_read && *line_read)
+	{
 		add_history(line_read);
 	}
 
 	return line_read;
 }
 
-static int cmd_c(char *args) {
+static int cmd_c(char *args)
+{
 	cpu_exec(-1);
 	return 0;
 }
 
-static int cmd_q(char *args) {
+static int cmd_q(char *args)
+{
 	return -1;
 }
 
-static int cmd_si(char *args){
+static int cmd_si(char *args)
+{
 	int n;
-	sscanf(args,"%d",&n);
+	sscanf(args, "%d", &n);
 	cpu_exec(n);
 	return 0;
 }
-char regname[8][4]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
-static int cmd_info(char *args){
-	if(strcmp(args,"r")==0){
-		for(int i=0;i<8;i++)
-		printf("%s\t%#010x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
-        printf("%s\t%#010x\t%d\n","eip",cpu.eip,cpu.eip);
+char regname[8][4] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
+static int cmd_info(char *args)
+{
+	if (strcmp(args, "r") == 0)
+	{
+		for (int i = 0; i < 4; i++)
+			printf("%s\t%#010x\t%d\n", regname[i], cpu.gpr[i]._32, cpu.gpr[i]._32);
 	}
 	return 0;
 }
-static int cmd_x(char *args){
+static int cmd_x(char *args)
+{
 	int n, addr;
-	sscanf(args,"%d %x",&n,&addr);
-	for(int i=0;i<n;i++){
-		if(i%4==0)
-		printf("%#010x:",addr+i*4);
-		printf(" %#010x",swaddr_read(addr+i*4,4));
-		if(i%4==3||i==n-1)
-		printf("\n");
+	sscanf(args, "%d %d", &n, &addr);
+	bool s;
+	uint32_t addrr = expr(args + strlen(args) + 1, &s);
+	for (int i = 0; i < n; i++)
+	{
+		if (i % 4 == 0)
+			printf("%#010x:", addrr);
+		printf(" %#010x", swaddr_read(addrr, 4));
+		addrr += 4;
+		if (i % 4 == 3 || i == n - 1)
+			printf("\n");
 	}
 	return 0;
 }
 
-static int cmd_p(char *args) {
+static int cmd_p(char *args)
+{
 	bool success;
 
-	if(args) {
+	if (args)
+	{
 		uint32_t r = expr(args, &success);
-		if(success) { printf("0x%08x(%d)\n", r, r); }
-		else { printf("Bad expression\n"); }
+		if (success)
+		{
+			printf("0x%08x(%d)\n", r, r);
+		}
+		else
+		{
+			printf("Bad expression\n");
+		}
 	}
 	return 0;
 }
 static int cmd_help(char *args);
 
-static struct {
+static struct
+{
 	char *name;
 	char *description;
-	int (*handler) (char *);
-} cmd_table [] = {
-	{ "help", "Display informations about all supported commands", cmd_help },
-	{ "c", "Continue the execution of the program", cmd_c },
-	{ "q", "Exit NEMU", cmd_q },
-	{ "si", "single take",cmd_si},
-	{ "info","print reg",cmd_info},
-	{ "x","print memory",cmd_x},
-	{"p","calculate",cmd_p}
+	int (*handler)(char *);
+} cmd_table[] = {
+	{"help", "Display informations about all supported commands", cmd_help},
+	{"c", "Continue the execution of the program", cmd_c},
+	{"q", "Exit NEMU", cmd_q},
+	{"si", "single take", cmd_si},
+	{"info", "print reg", cmd_info},
+	{"x", "print memory", cmd_x},
+	{"p", "calculate", cmd_p}
 
 	/* TODO: Add more commands */
 
@@ -95,20 +116,26 @@ static struct {
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
 
-static int cmd_help(char *args) {
+static int cmd_help(char *args)
+{
 	/* extract the first argument */
 	char *arg = strtok(NULL, " ");
 	int i;
 
-	if(arg == NULL) {
+	if (arg == NULL)
+	{
 		/* no argument given */
-		for(i = 0; i < NR_CMD; i ++) {
+		for (i = 0; i < NR_CMD; i++)
+		{
 			printf("%s - %s\n", cmd_table[i].name, cmd_table[i].description);
 		}
 	}
-	else {
-		for(i = 0; i < NR_CMD; i ++) {
-			if(strcmp(arg, cmd_table[i].name) == 0) {
+	else
+	{
+		for (i = 0; i < NR_CMD; i++)
+		{
+			if (strcmp(arg, cmd_table[i].name) == 0)
+			{
 				printf("%s - %s\n", cmd_table[i].name, cmd_table[i].description);
 				return 0;
 			}
@@ -118,21 +145,26 @@ static int cmd_help(char *args) {
 	return 0;
 }
 
-
-void ui_mainloop() {
-	while(1) {
+void ui_mainloop()
+{
+	while (1)
+	{
 		char *str = rl_gets();
 		char *str_end = str + strlen(str);
 
 		/* extract the first token as the command */
 		char *cmd = strtok(str, " ");
-		if(cmd == NULL) { continue; }
+		if (cmd == NULL)
+		{
+			continue;
+		}
 
 		/* treat the remaining string as the arguments,
 		 * which may need further parsing
 		 */
 		char *args = cmd + strlen(cmd) + 1;
-		if(args >= str_end) {
+		if (args >= str_end)
+		{
 			args = NULL;
 		}
 
@@ -142,13 +174,21 @@ void ui_mainloop() {
 #endif
 
 		int i;
-		for(i = 0; i < NR_CMD; i ++) {
-			if(strcmp(cmd, cmd_table[i].name) == 0) {
-				if(cmd_table[i].handler(args) < 0) { return; }
+		for (i = 0; i < NR_CMD; i++)
+		{
+			if (strcmp(cmd, cmd_table[i].name) == 0)
+			{
+				if (cmd_table[i].handler(args) < 0)
+				{
+					return;
+				}
 				break;
 			}
 		}
 
-		if(i == NR_CMD) { printf("Unknown command '%s'\n", cmd); }
+		if (i == NR_CMD)
+		{
+			printf("Unknown command '%s'\n", cmd);
+		}
 	}
 }
