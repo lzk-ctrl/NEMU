@@ -226,7 +226,34 @@ static uint32_t eval(int s, int e, bool *success) {
 		}
 	}
 }
+uint32_t get_reg_val(const char *s, bool *success) {
+	int i;
+	*success = true;
+	for(i = 0; i < 8; i ++) {
+		if(strcmp(regsl[i], s) == 0) {
+			return reg_l(i);
+		}
+	}
 
+	for(i = 0; i < 8; i ++) {
+		if(strcmp(regsw[i], s) == 0) {
+			return reg_w(i);
+		}
+	}
+
+	for(i = 0; i < 8; i ++) {
+		if(strcmp(regsb[i], s) == 0) {
+			return reg_b(i);
+		}
+	}
+
+	if(strcmp("eip", s) == 0) {
+		return cpu.eip;
+	}
+
+	*success = false;
+	return 0;
+}
 uint32_t expr(char *e, bool *success) {
 	if(!make_token(e)) {
 		*success = false;
@@ -264,4 +291,3 @@ int i;
 
 	return eval(0, nr_token - 1, success);
 }
-

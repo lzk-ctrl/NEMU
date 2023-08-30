@@ -43,22 +43,14 @@ static int cmd_si(char *args){
 	return 0;
 }
 char regname[8][4]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
-static int cmd_info(char *args) {
-    if(args) {
-        if( args[0] == 'r' ) {
-            int i;
-            for(i = 0; i <= R_EDI; i++) {
-                printf( "$%s\t0x%08x\t%d\n", regsl[i], reg_l(i), reg_l(i));
-            }
-            printf( "$eip\t0x%08x\t%d\n", cpu.eip, cpu.eip );
-        }
-            //或者一个一个打出来也可以
-    }
-    else printf("Invalid Command");
-    
-    return 0;
+static int cmd_info(char *args){
+	if(strcmp(args,"r")==0){
+		for(int i=0;i<8;i++)
+		printf("%s\t%#010x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
+        printf("%s\t%#010x\t%d\n","eip",cpu.eip,cpu.eip);
+	}
+	return 0;
 }
-
 static int cmd_x(char *args){
 	int n, addr;
 	sscanf(args,"%d %x",&n,&addr);
