@@ -113,16 +113,16 @@ bool check_wp()
 		{
 			if (ls == f->eval)
 			{
-				printf("Hint watchpoint %d at 0x%x:\n", f->NO, cpu.eip);
-				printf("value: %d (0x%x)\n", ls, ls);
+				printf("Hint watchpoint %d at address %#010x:\n", f->NO, cpu.eip);
+				printf("expr=($eip==%#010x)\n", ls);
 				flag = 0;
 			}
 		}
 		else if (ls != f->val)
 		{
-			printf("Hint watchpoint %d at 0x%x:\n", f->NO, cpu.eip);
-			printf("old value: %d (0x%x)\n", f->val, f->val);
-			printf("new value: %d (0x%x)\n", ls, ls);
+			printf("Hint watchpoint %d at address %#010x:\n", f->NO, cpu.eip);
+			printf("old value= %#010x\n", f->val);
+			printf("new value= %#010x \n", ls);
 			f->val = ls;
 			flag = 0;
 		}
