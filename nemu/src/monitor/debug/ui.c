@@ -60,10 +60,11 @@ static int cmd_info(char *args)
 }
 static int cmd_x(char *args)
 {
-	int n, addr;
-	sscanf(args, "%d %d", &n, &addr);
+	char *arg = strtok(NULL, " ");
+	int n;
+	sscanf(arg, "%d", &n);
 	bool s;
-	uint32_t addrr = expr(args + strlen(args) + 1, &s);
+	uint32_t addrr = expr(arg + strlen(arg) + 1, &s);
 	for (int i = 0; i < n; i++)
 	{
 		if (i % 4 == 0)
