@@ -107,20 +107,21 @@ bool check_wp()
 	while (f != NULL)
 	{
 		uint32_t ls = expr(f->expr, &suc);
+		bool s;
 		if (!suc)
 			Assert(1, "REEOR\n");
 		if (f->check_eval)
 		{
 			if (ls == f->eval)
 			{
-				printf("Hint watchpoint %d at address %#010x,expr=%s\n", f->NO, cpu.eip,f->expr);
+				printf("Hint watchpoint %d at address %#010x,expr=%s\n", f->NO, expr(f->expr,&s),f->expr);
 				printf("expr=($eip==%#010x)\n", ls);
 				flag = 0;
 			}
 		}
 		else if (ls != f->val)
 		{
-			printf("Hint watchpoint %d at address %#010x,expr=%s\n", f->NO, cpu.eip,f->expr);
+			printf("Hint watchpoint %d at address %#010x,expr=%s\n", f->NO, expr(f->expr,&s),f->expr);
 			printf("old value= %#010x\n", f->val);
 			printf("new value= %#010x \n", ls);
 			f->val = ls;
