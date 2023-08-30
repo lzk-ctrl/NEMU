@@ -45,7 +45,7 @@ static int cmd_si(char *args){
 char regname[8][4]= {"eax","ecx","edx","ebx","esp","ebp","esi","edi"};
 static int cmd_info(char *args){
 	if(strcmp(args,"r")==0){
-		for(int i=0;i<4;i++)
+		for(int i=0;i<8;i++)
 		printf("%s\t%#010x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
       
 	}
