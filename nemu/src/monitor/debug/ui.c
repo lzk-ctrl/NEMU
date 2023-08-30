@@ -47,20 +47,17 @@ static int cmd_info(char *args){
 	if(strcmp(args,"r")==0){
 		for(int i=0;i<8;i++)
 		printf("%s\t%#010x\t%d\n",regname[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
-      
+        printf("%s\t%#010x\t%d\n","eip",cpu.eip,cpu.eip);
 	}
 	return 0;
 }
 static int cmd_x(char *args){
-	int n,addr;
-	sscanf(args,"%d %d",&n,&addr);
-	bool s;
-	uint32_t addrr=expr(args + strlen(args) + 1, &s);
+	int n, addr;
+	sscanf(args,"%d %x",&n,&addr);
 	for(int i=0;i<n;i++){
 		if(i%4==0)
-		printf("%#010x:",addrr);
-		printf(" %#010x",swaddr_read(addrr,4));
-		addrr+=4;
+		printf("%#010x:",addr+i*4);
+		printf(" %#010x",swaddr_read(addr+i*4,4));
 		if(i%4==3||i==n-1)
 		printf("\n");
 	}
