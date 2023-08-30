@@ -56,6 +56,11 @@ static int cmd_info(char *args)
 		for (int i = 0; i < 4; i++)
 			printf("%s\t%#010x\t%d\n", regname[i], cpu.gpr[i]._32, cpu.gpr[i]._32);
 	}
+	if (strcmp(args, "w") == 0)
+	{
+		info_wp();
+		return 0;
+	}
 	return 0;
 }
 static int cmd_x(char *args)
@@ -95,6 +100,30 @@ static int cmd_p(char *args)
 	}
 	return 0;
 }
+static int cmd_w(char *args)
+{
+	if (args == NULL)
+		return puts("Wrong args!!"), 1;
+	WP *f;
+	bool suc;
+	f = new_wp();
+	f->val = expr(args, &suc);
+	if (!suc)
+	{
+		return puts("Wrong args!!"), 1;
+	}
+	strcpy(f->expr, args);
+	printf("Watchpoint created: Watchpoint %d: %s = 0x%x\n", f->NO, f->expr, f->val);
+	return 0;
+}
+static int cmd_d(char *args)
+{
+	if (args == NULL)
+		return puts("Wrong args!!"), 1;
+	delete_wp(atoi(args));
+	return 0;
+}
+
 static int cmd_help(char *args);
 
 static struct
@@ -109,7 +138,9 @@ static struct
 	{"si", "single take", cmd_si},
 	{"info", "print reg", cmd_info},
 	{"x", "print memory", cmd_x},
-	{"p", "calculate", cmd_p}
+	{"p", "calculate", cmd_p},
+	{"d", "watchpoint", cmd_d},
+	{"w","ww",cmd_w}
 
 	/* TODO: Add more commands */
 
