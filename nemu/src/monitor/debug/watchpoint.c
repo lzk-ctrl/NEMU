@@ -1,18 +1,15 @@
 #include "monitor/watchpoint.h"
 #include "monitor/expr.h"
-#include "nemu.h"
-
 #include <stdlib.h>
+
 #define NR_WP 32
 
 static WP wp_pool[NR_WP];
 static WP *head, *free_;
 
-void init_wp_pool()
-{
+void init_wp_pool() {
 	int i;
-	for (i = 0; i < NR_WP; i++)
-	{
+	for(i = 0; i < NR_WP; i ++) {
 		wp_pool[i].NO = i;
 		wp_pool[i].next = &wp_pool[i + 1];
 	}
@@ -24,109 +21,73 @@ void init_wp_pool()
 
 /* TODO: Implement the functionality of watchpoint */
 
-WP *new_wp()
-{
-	WP *f, *p;
-	f = free_;
+static WP* new_WP() {
+	assert(free_ != NULL);
+	WP *p = free_;
 	free_ = free_->next;
-	f->next = NULL;
-	p = head;
-	if (p == NULL)
-		p = head = f;
-	else
-	{
-		while (p->next != NULL)
-			p = p->next;
-		p->next = f;
+	return p;
+}
+
+static void free_WP(WP *p) {
+	assert(p >= wp_pool && p < wp_pool + NR_WP);
+	free(p->expr);
+	p->next = free_;
+	free_ = p;
+}
+
+int set_watchpoint(char *e) {
+	uint32_t val;
+	bool success;
+	val = expr(e, &success);
+	if(!success) return -1;
+
+	WP *p = new_WP();
+	p->expr = strdup(e);
+	p->old_val = val;
+
+	p->next = head;
+	head = p;
+
+	return p->NO;
+}
+
+bool delete_watchpoint(int NO) {
+	WP *p, *prev = NULL;
+	for(p = head; p != NULL; prev = p, p = p->next) {
+		if(p->NO == NO) { break; }
 	}
-	f->check_eval = false;
-	return f;
+
+	if(p == NULL) { return false; }
+	if(prev == NULL) { head = p->next; }
+	else { prev->next = p->next; }
+
+	free_WP(p);
+	return true;
 }
-void delete_wp(int num) {
-  WP * f;
-  f = &wp_pool[num];
-  free_wp(f);
-}
-void free_wp(WP *wp)
-{
+
+void list_watchpoint() {
+	if(head == NULL) {
+		printf("No watchpoints\n");
+		return;
+	}
+
+	printf("%8s\t%8s\t%8s\n", "NO", "Address", "Enable");
 	WP *p;
-	p = head;
-	if (head == NULL)
-		Assert(0, "ERROR");
-	else if (p->NO == wp->NO)
-	{
-		head = head->next;
-		p->next = free_;
-		p->val = 0;
-		p->expr[0] = '\0';
-		free_ = p;
-		return;
-	}
-	else
-	{
-		WP *ls = head;
-		p = p->next;
-		while (p != NULL)
-		{
-			if (p->NO == wp->NO)
-			{
-				ls->next = p->next;
-				p->val = 0;
-				p->next = free_;
-				p->expr[0] = '\0';
-				free_ = p;
-				return;
-			}
-			else
-				p = p->next, ls = ls->next;
-		}
+	for(p = head; p != NULL; p = p->next) {
+		printf("%8d\t%s\t%#08x\n", p->NO, p->expr, p->old_val);
 	}
 }
 
-void info_wp()
-{
-	WP *f;
-	f = head;
-	if (f == NULL)
-	{
-		puts("No watchpoints currently set.");
-		return;
+WP* scan_watchpoint() {
+	WP *p;
+	for(p = head; p != NULL; p = p->next) {
+		bool success;
+		p->new_val = expr(p->expr, &success);
+		if(p->old_val != p->new_val) {
+			return p;
+		}
 	}
-	while (f != NULL)
-	{
-		printf("%d: %s = %d\n", f->NO, f->expr, f->val);
-		f = f->next;
-	}
+
+	return NULL;
 }
 
-bool check_wp()
-{
-	WP *f;
-	f = head;
-	bool suc, flag = 1;
-	while (f != NULL)
-	{
-		uint32_t ls = expr(f->expr, &suc);
-		if (!suc)
-			Assert(1, "REEOR\n");
-		if (f->check_eval)
-		{
-			if (ls == f->eval)
-			{
-				printf("Hint watchpoint %d at address %#010x,expr=%s\n", f->NO, cpu.eip,f->expr);
-				printf("expr=($eip==%#010x)\n", ls);
-				flag = 0;
-			}
-		}
-		else if (ls != f->val)
-		{
-			printf("Hint watchpoint %d at address %#010x,expr=%s\n", f->NO, cpu.eip,f->expr);
-			printf("old value= %#010x\n", f->val);
-			printf("new value= %#010x \n", ls);
-			f->val = ls;
-			flag = 0;
-		}
-		f = f->next;
-	}
-	return flag;
-}
