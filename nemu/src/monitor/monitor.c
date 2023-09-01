@@ -80,7 +80,7 @@ void restart() {
 	/* Read the file with name `argv[1]' into ramdisk. */
 	init_ramdisk();
 #endif
-
+    cpu.eflags.val = 0x00000002;
 	/* Read the entry code into memory. */
 	load_entry();
 
