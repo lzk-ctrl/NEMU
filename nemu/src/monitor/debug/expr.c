@@ -7,11 +7,14 @@
 #include <regex.h>
 #include <stdlib.h>
 
+uint32_t look_up_symtab(char *, bool *);
+
 enum {
 	NOTYPE = 256, EQ
 
 	/* TODO: Add more token types */
-        , NUM, NEQ, OR, AND, REG, REF, NEG
+
+	, NEQ, OR, AND, NUM, REG, ID, REF, NEG
 };
 
 static struct rule {
@@ -28,17 +31,20 @@ static struct rule {
 	{"==", EQ},						// equal
 	{"0x[0-9a-fA-F]{1,8}", NUM},			// hex
 	{"[0-9]{1,10}", NUM},					// dec
-	{"\\$[a-z]{1,31}", REG},				// register names 
+	{"\\$[a-z]{1,31}", REG},				// register names
+	{"[a-zA-Z_]{1,31}", ID},				// identifiers 
+	{"\\+", '+'},
 	{"-", '-'},
 	{"\\*", '*'},
 	{"/", '/'},
 	{"%", '%'},
+	{"==", EQ},
 	{"!=", NEQ},
 	{"&&", AND},
 	{"\\|\\|", OR},
 	{"!", '!'},
 	{"\\(", '('},
-	{"\\)", ')'} 
+	{"\\)", ')'}
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -84,19 +90,18 @@ static bool make_token(char *e) {
 				char *substr_start = e + position;
 				int substr_len = pmatch.rm_eo;
 
-				Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s", i, rules[i].regex, position, substr_len, substr_len, substr_start);
 				position += substr_len;
 
 				/* TODO: Now a new token is recognized with rules[i]. Add codes
-				 * to record the token in the array `tokens'. For certain types
-				 * of tokens, some extra actions should be performed.
+				 * to record the token in the array ``tokens''. For certain 
+				 * types of tokens, some extra actions should be performed.
 				 */
 
 				switch(rules[i].token_type) {
-                                        case NOTYPE: break;
-                                        case NUM:
-					//default: panic("please implement me");
-                                        case REG: sprintf(tokens[nr_token].str, "%.*s", substr_len, substr_start);
+					case NOTYPE: break;
+					case NUM:
+					case ID:
+					case REG: sprintf(tokens[nr_token].str, "%.*s", substr_len, substr_start);
 					default: tokens[nr_token].type = rules[i].token_type;
 							 nr_token ++;
 				}
@@ -113,8 +118,6 @@ static bool make_token(char *e) {
 
 	return true; 
 }
-
-/*TODO: Expression evaluation*/
 
 static int op_prec(int t) {
 	switch(t) {
@@ -138,7 +141,7 @@ static int find_dominated_op(int s, int e, bool *success) {
 	int dominated_op = -1;
 	for(i = s; i <= e; i ++) {
 		switch(tokens[i].type) {
-			case REG: case NUM: break;
+			case REG: case NUM: case ID: break;
 
 			case '(': 
 				bracket_level ++; 
@@ -187,6 +190,9 @@ static uint32_t eval(int s, int e, bool *success) {
 					  break;
 
 			case NUM: val = strtol(tokens[s].str, NULL, 0); break;
+			case ID: val = look_up_symtab(tokens[s].str, success);
+					 if(!*success) { return 0; }
+					 break;
 
 			default: assert(0);
 		}
@@ -234,18 +240,13 @@ static uint32_t eval(int s, int e, bool *success) {
 	}
 }
 
-/* TODO: Expression evaluation end */
-
 uint32_t expr(char *e, bool *success) {
 	if(!make_token(e)) {
 		*success = false;
 		return 0;
 	}
 
-	/* TODO: Insert codes to evaluate the expression. */
-       	//panic("please implement me");
-	//return 0;
-        /* Detect REF and NEG tokens */
+	/* Detect REF and NEG tokens */
 	int i;
 	int prev_type;
 	for(i = 0; i < nr_token; i ++) {
@@ -256,7 +257,8 @@ uint32_t expr(char *e, bool *success) {
 			}
 
 			prev_type = tokens[i - 1].type;
-			if( !(prev_type == ')' || prev_type == NUM || prev_type == REG) ) {
+			if( !(prev_type == ')' || prev_type == ID || prev_type == NUM || 
+						prev_type == REG) ) {
 				tokens[i].type = NEG;
 			}
 		}
@@ -268,7 +270,8 @@ uint32_t expr(char *e, bool *success) {
 			}
 
 			prev_type = tokens[i - 1].type;
-			if( !(prev_type == ')' || prev_type == NUM || prev_type == REG) ) {
+			if( !(prev_type == ')' || prev_type == ID || prev_type == NUM || 
+						prev_type == REG) ) {
 				tokens[i].type = REF;
 			}
 		}
@@ -276,4 +279,3 @@ uint32_t expr(char *e, bool *success) {
 
 	return eval(0, nr_token - 1, success);
 }
-
