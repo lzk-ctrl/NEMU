@@ -55,14 +55,12 @@ make_group(group2_1_v,
 
 /* 0xd2 */
 make_group(group2_cl_b,
-           inv, inv, inv, inv,
-           shl_rm_cl_b, shr_rm_cl_b, inv, sar_rm_cl_b)
-
+	inv, inv, inv, inv, 
+	inv, inv, inv, inv)
 /* 0xd3 */
 make_group(group2_cl_v,
-           inv, inv, inv, inv,
-           shl_rm_cl_v, shr_rm_cl_v, inv, sar_rm_cl_v)
-
+	inv, inv, inv, inv, 
+	shl_rm_cl_v, inv, inv, sar_rm_cl_v)
 
 /* 0xf6 */
 make_group(group3_b,
