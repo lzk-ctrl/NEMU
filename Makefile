@@ -54,7 +54,7 @@ clean: clean-cpp
 
 ##### some convinient rules #####
 
-USERPROG := obj/testcase/hello-inline-asm
+USERPROG := obj/testcase/bit
 ENTRY := $(USERPROG)
 
 entry: $(ENTRY)
