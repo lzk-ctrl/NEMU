@@ -42,3 +42,4 @@
 #include "logic/test.h"
 #include "data-mov/push.h"
 #include "control/jcc.h"
+#include "data-mov/pop.h"
