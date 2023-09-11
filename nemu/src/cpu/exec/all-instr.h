@@ -45,3 +45,4 @@
 #include "data-mov/pop.h"
 #include "control/ret.h"
 #include "arith/add.h"
+#include "logic/setcc.h"
