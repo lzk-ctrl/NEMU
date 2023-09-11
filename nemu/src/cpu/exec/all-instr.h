@@ -5,6 +5,7 @@
 #include "data-mov/movext.h"
 #include "data-mov/cltd.h"
 
+#include "arith/cmp.h"
 #include "arith/adc.h"
 #include "arith/dec.h"
 #include "arith/inc.h"
@@ -15,7 +16,7 @@
 #include "arith/div.h"
 #include "arith/sbb.h"
 #include "arith/sub.h"
-#include "arith/cmp.h"
+
 
 #include "control/jmp.h"
 
