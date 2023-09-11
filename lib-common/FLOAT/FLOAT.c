@@ -1,8 +1,8 @@
 #include "FLOAT.h"
 
 FLOAT F_mul_F(FLOAT a, FLOAT b) {
-	nemu_assert(0);
-	return 0;
+	long long c=(long long )a*(long long)b;
+	return (FLOAT)(c>>16);
 }
 
 FLOAT F_div_F(FLOAT a, FLOAT b) {
@@ -23,9 +23,9 @@ FLOAT F_div_F(FLOAT a, FLOAT b) {
 	 * It is OK not to use the template above, but you should figure
 	 * out another way to perform the division.
 	 */
-
-	nemu_assert(0);
-	return 0;
+	FLOAT p, q;
+	asm volatile("idiv %2" : "=a"(p), "=d"(q) : "r"(b), "a"(a << 16), "d"(a >> 16));
+	return p;
 }
 
 FLOAT f2F(float a) {
@@ -39,13 +39,25 @@ FLOAT f2F(float a) {
 	 * performing arithmetic operations on it directly?
 	 */
 
-	nemu_assert(0);
-	return 0;
+	int b = *(int *)&a;
+	int sign = b >> 31;
+	int exp = (b >> 23) & 0xff;
+	FLOAT c = b & 0x7fffff;
+	if (exp != 0) {
+		c += 1 << 23;
+	}
+	exp -= 150;
+	if (exp < -16) {
+		c >>= -16 - exp;
+	}
+	if (exp > -16) {
+		c <<= exp + 16;
+	}
+	return sign == 0 ? c : -c;
 }
 
 FLOAT Fabs(FLOAT a) {
-	nemu_assert(0);
-	return 0;
+	return (a>0)?a:-a;
 }
 
 /* Functions below are already implemented */
