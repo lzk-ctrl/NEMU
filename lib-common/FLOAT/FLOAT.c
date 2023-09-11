@@ -1,5 +1,5 @@
 #include "FLOAT.h"
-
+#include "string.h"
 FLOAT F_mul_F(FLOAT a, FLOAT b) {
 	long long c=(long long )a*(long long)b;
 	return (FLOAT)(c>>16);
