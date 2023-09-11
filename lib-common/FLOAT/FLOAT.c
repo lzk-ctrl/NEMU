@@ -29,31 +29,23 @@ FLOAT F_div_F(FLOAT a, FLOAT b) {
 }
 
 FLOAT f2F(float a) {
-	/* You should figure out how to convert `a' into FLOAT without
-	 * introducing x87 floating point instructions. Else you can
-	 * not run this code in NEMU before implementing x87 floating
-	 * point instructions, which is contrary to our expectation.
-	 *
-	 * Hint: The bit representation of `a' is already on the
-	 * stack. How do you retrieve it to another variable without
-	 * performing arithmetic operations on it directly?
-	 */
-
-	int b = *(int *)&a;
-	int sign = b >> 31;
-	int exp = (b >> 23) & 0xff;
-	FLOAT c = b & 0x7fffff;
+	int arr[1];
+	memcpy((void *)arr, (void *)&a, 4);
+	int cnt = arr[0];
+	int sign = cnt >> 31;
+	int exp = (cnt >> 23) & 0xff;
+	FLOAT x = cnt & 0x7fffff;
 	if (exp != 0) {
-		c += 1 << 23;
+		x += 1 << 23;
 	}
 	exp -= 150;
 	if (exp < -16) {
-		c >>= -16 - exp;
+		x >>= -16 - exp;
 	}
 	if (exp > -16) {
-		c <<= exp + 16;
+		x <<= exp + 16;
 	}
-	return sign == 0 ? c : -c;
+	return (sign == 0) ? x : -x;
 }
 
 FLOAT Fabs(FLOAT a) {
