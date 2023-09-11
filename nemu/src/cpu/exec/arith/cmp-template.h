@@ -1,5 +1,5 @@
 #include "cpu/exec/template-start.h"
-
+#include "cpu/eflags.h"
 #define instr cmp
 
 static void do_execute () {
