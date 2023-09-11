@@ -47,3 +47,4 @@
 #include "arith/add.h"
 #include "logic/setcc.h"
 #include "data-mov/leave.h"
+#include "string/lods.h"
