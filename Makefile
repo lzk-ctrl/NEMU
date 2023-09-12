@@ -54,7 +54,7 @@ clean: clean-cpp
 
 ##### some convinient rules #####
 
-USERPROG := obj/testcase/bubble-sort
+USERPROG := obj/testcase/integral
 ENTRY := $(USERPROG)
 
 entry: $(ENTRY)
