@@ -54,7 +54,7 @@ clean: clean-cpp
 
 ##### some convinient rules #####
 
-USERPROG := obj/testcase/add
+USERPROG := obj/testcase/mul-longlong
 ENTRY := $(USERPROG)
 
 entry: $(ENTRY)
