@@ -1,8 +1,8 @@
 #include "FLOAT.h"
 
 FLOAT F_mul_F(FLOAT a, FLOAT b) {
-	long long c=(long long )a*(long long)b;
-	return (FLOAT)(c>>16);
+	long long c = (long long)a * (long long)b;
+	return (FLOAT)(c >> 16);
 }
 
 FLOAT F_div_F(FLOAT a, FLOAT b) {
@@ -23,9 +23,32 @@ FLOAT F_div_F(FLOAT a, FLOAT b) {
 	 * It is OK not to use the template above, but you should figure
 	 * out another way to perform the division.
 	 */
-	FLOAT p, q;
-	asm volatile("idiv %2" : "=a"(p), "=d"(q) : "r"(b), "a"(a << 16), "d"(a >> 16));
-	return p;
+
+	int sign = 1;
+	if (a < 0) 
+	{
+		sign = -sign;
+		a = -a;
+	}
+	if (b < 0) 
+	{
+		sign = -sign;
+		b = -b;
+	}
+	int res = a / b;
+	a = a % b;
+	int i;
+	for (i = 0; i < 16; i++) 
+	{
+		a <<= 1;
+		res <<= 1;
+		if (a >= b) 
+		{
+			a -= b;
+			res++;
+		}
+	}
+	return res * sign;
 }
 
 FLOAT f2F(float a) {
@@ -42,22 +65,21 @@ FLOAT f2F(float a) {
 	int b = *(int *)&a;
 	int sign = b >> 31;
 	int exp = (b >> 23) & 0xff;
-	FLOAT c = b & 0x7fffff;
-	if (exp != 0) {
-		c += 1 << 23;
-	}
+	FLOAT k = b & 0x7fffff;
+	if (exp != 0) k += 1 << 23;
 	exp -= 150;
-	if (exp < -16) {
-		c >>= -16 - exp;
-	}
-	if (exp > -16) {
-		c <<= exp + 16;
-	}
-	return sign == 0 ? c : -c;
+	if (exp < -16) k >>= -16 - exp;
+	if (exp > -16) k <<= exp + 16;
+	return sign == 0 ? k : -k;
 }
 
 FLOAT Fabs(FLOAT a) {
-	return (a>0)?a:-a;
+	FLOAT b;
+	if (a < 0)
+		b = - a;
+	else
+		b = a;
+	return b;
 }
 
 /* Functions below are already implemented */
