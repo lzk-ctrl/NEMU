@@ -10,7 +10,7 @@
 extern Elf32_Sym *symtab;
 extern int nr_symtab_entry;
 extern char* strtab;
-uint32_t GetMarkValue(char *str,bool *success);
+uint32_t getValue(char *str,bool *success);
 
 enum {
 	NOTYPE = 256, EQ, NUM, HEXNUM, REG, NOTEQ, OR, AND, NOT, MARK
@@ -193,7 +193,7 @@ int eval(int p,int q)
 		else if(tokens[p].type==MARK)
 		{
 			bool success=false;
-			return GetMarkValue(tokens[p].str , &success);
+			return getValue(tokens[p].str , &success);
 		}
 	}
 	else if(check_parentheses(p,q))

@@ -81,17 +81,13 @@ void load_elf_tables(int argc, char *argv[]) {
 	fclose(fp);
 }
 
-uint32_t GetMarkValue(char* str,bool* success){
-
+uint32_t getValue(char* str,bool* success){
 	int i;
 	for (i = 0; i < nr_symtab_entry; i++){
-		if ((symtab[i].st_info & 0xf) == STT_OBJECT){
-			char syb[32];
-			int stlen = strlen(str);
-			strncpy(syb,strtab + symtab[i].st_name,stlen);
-			syb [stlen] = '\0';
-			if (strcmp(syb,str) == 0){
-				*success = true;
+        //STT_OBJECT代表符号的类型是一个数据对象，例如变量、数组、指针（符号的类型在低四位）
+		if ((symtab[i].st_info & 0xf) == STT_OBJECT || (symtab[i].st_info & 0xf) == STT_FUNC){ 
+            //字符串表+符号偏移量 = 符号所在地址STT_FUNC代表符号的类型是一个函数（符号的类型在低四位）
+			if (strcmp(strtab + symtab[i].st_name, str) == 0){ 
 				return symtab[i].st_value;
 			} 
 		}
@@ -100,16 +96,14 @@ uint32_t GetMarkValue(char* str,bool* success){
 	return 0;
 }
 
-void get_func_name(swaddr_t *current_addr,char *name)
-{
+char* getFuncName(swaddr_t eip) {
 	int i;
-	for(i=0;i<nr_symtab_entry;i++){
-		if(((symtab[i].st_info&0xf)==STT_FUNC) &&( symtab[i].st_value<*current_addr)&&(symtab[i].st_value+symtab[i].st_size>=*current_addr)){
-			int len=strlen(strtab+symtab[i].st_name);
-			strncpy(name,strtab+symtab[i].st_name,len);
-			name[len]='\0';
-			return;
+	for(i = 0; i < nr_symtab_entry; i ++) {
+		if((symtab[i].st_info & 0xf) == STT_FUNC ){
+				if(eip >= symtab[i].st_value && eip <= symtab[i].st_value + symtab[i].st_size)  {
+				return strtab + symtab[i].st_name;
+		}
 		}
 	}
-	name[0]='\0';
+	return 0;
 }
