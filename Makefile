@@ -54,7 +54,7 @@ clean: clean-cpp
 
 ##### some convinient rules #####
 
-USERPROG := obj/testcase/hello-str
+USERPROG := obj/testcase/to-lower-case
 ENTRY := $(USERPROG)
 
 entry: $(ENTRY)
