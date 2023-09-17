@@ -1,5 +1,6 @@
 #include "nemu.h"
 
+
 #define ENTRY_START 0x100000
 
 extern uint8_t entry [];
@@ -10,7 +11,7 @@ void load_elf_tables(int, char *[]);
 void init_regex();
 void init_wp_pool();
 void init_ddr3();
-
+void init_cache();
 FILE *log_fp = NULL;
 
 static void init_log() {
@@ -89,4 +90,5 @@ void restart() {
 
 	/* Initialize DRAM. */
 	init_ddr3();
+	init_cache();
 }
