@@ -74,6 +74,16 @@ static void load_entry() {
 	assert(ret == 1);
 	fclose(fp);
 }
+static void init_CS(){
+	cpu.cs.base = 0;
+  	cpu.cs.limit = 0xffffffff;
+}
+
+static void init_cr0(){
+	cpu.cr0.protect_enable = 0; //real mode turn to protect mode
+	//cpu.cr0.paging = 0; //page mode
+}
+
 
 void restart() {
 	/* Perform some initialization to restart a program */
@@ -91,4 +101,7 @@ void restart() {
 	/* Initialize DRAM. */
 	init_ddr3();
 	init_cache();
+	init_cr0();
+	
+	init_CS();   
 }
