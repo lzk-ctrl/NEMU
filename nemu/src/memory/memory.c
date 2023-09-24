@@ -6,11 +6,25 @@ void dram_write(hwaddr_t, size_t, uint32_t);
 /* Memory accessing interfaces */
 
 uint32_t hwaddr_read(hwaddr_t addr, size_t len) {
-	return dram_read(addr, len) & (~0u >> ((4 - len) << 3));
+	uint32_t offset = addr & (CACHE_BLOCK - 1);
+	uint32_t block = cache_read(addr);
+	uint8_t temp[4];
+	memset(temp, 0, sizeof(temp));
+	if (offset + len >= CACHE_BLOCK) {
+		uint32_t second_block = cache_read(addr + len);
+		memcpy(temp, cache[block].byte + offset, CACHE_BLOCK - offset);
+		memcpy(temp + CACHE_BLOCK - offset, cache[second_block].byte, len - (CACHE_BLOCK - offset));
+	} else {
+		memcpy(temp, cache[block].byte + offset, len);
+	}
+	int zero = 0;
+	uint32_t result = unalign_rw(temp + zero, 4) & (~0u >> ((4 - len) << 3));
+	//printf("time: %ld\n", cnt);
+	return result;
 }
 
 void hwaddr_write(hwaddr_t addr, size_t len, uint32_t data) {
-	dram_write(addr, len, data);
+	cache_write(addr, len, data);
 }
 
 uint32_t lnaddr_read(lnaddr_t addr, size_t len) {
@@ -33,26 +47,4 @@ void swaddr_write(swaddr_t addr, size_t len, uint32_t data) {
 	assert(len == 1 || len == 2 || len == 4);
 #endif
 	lnaddr_write(addr, len, data);
-}
-
-uint32_t hwaddr_read(hwaddr_t addr, size_t len) {
-	uint32_t offset = addr & (CACHE_BLOCK - 1);
-	uint32_t block = cache_read(addr);
-	uint8_t temp[4];
-	memset(temp, 0, sizeof(temp));
-	if (offset + len >= CACHE_BLOCK) {
-		uint32_t second_block = cache_read(addr + len);
-		memcpy(temp, cache[block].byte + offset, CACHE_BLOCK - offset);
-		memcpy(temp + CACHE_BLOCK - offset, cache[second_block].byte, len - (CACHE_BLOCK - offset));
-	} else {
-		memcpy(temp, cache[block].byte + offset, len);
-	}
-	int zero = 0;
-	uint32_t result = unalign_rw(temp + zero, 4) & (~0u >> ((4 - len) << 3));
-	//printf("time: %ld\n", cnt);
-	return result;
-}
-
-void hwaddr_write(hwaddr_t addr, size_t len, uint32_t data) {
-	cache_write(addr, len, data);
 }
