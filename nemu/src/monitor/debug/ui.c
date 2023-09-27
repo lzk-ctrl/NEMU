@@ -8,8 +8,10 @@
 #include <readline/history.h>
 
 void cpu_exec(uint32_t);
-void display_reg();
-
+WP* new_wp();
+void free_wp(WP *wp);
+void show_watchpoint();
+bool delete_watchpoint(int no);
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 char* rl_gets() {
 	static char *line_read = NULL;
@@ -28,98 +30,6 @@ char* rl_gets() {
 	return line_read;
 }
 
-/* TODO: Add single step */
-static int cmd_si(char *args) {
-	char *arg = strtok(NULL, " ");
-	int i = 1;
-
-	if(arg != NULL) {
-		sscanf(arg, "%d", &i);
-	}
-	cpu_exec(i);
-	return 0;
-}
-
-/* TODO: Add info command */
-static int cmd_info(char *args) {
-	char *arg = strtok(NULL, " ");
-
-	if(arg != NULL) {
-		if(strcmp(arg, "r") == 0) {
-			display_reg();
-		}
-		else if(strcmp(arg, "w") == 0) {
-			list_watchpoint();
-		}
-	}
-	return 0;
-}
-
-/* Add examine memory */
-static int cmd_x(char *args) {
-	char *arg = strtok(NULL, " ");
-	int n;
-	swaddr_t addr;
-	int i;
-
-	if(arg != NULL) {
-		sscanf(arg, "%d", &n);
-
-		bool success;
-		addr = expr(arg + strlen(arg) + 1, &success);
-		if(success) { 
-			for(i = 0; i < n; i ++) {
-				if(i % 4 == 0) {
-					printf("0x%08x: ", addr);
-				}
-
-				printf("0x%08x ", swaddr_read(addr, 4));
-				addr += 4;
-				if(i % 4 == 3) {
-					printf("\n");
-				}
-			}
-			printf("\n");
-		}
-		else { printf("Bad expression\n"); }
-
-	}
-	return 0;
-}
-
-/* Add expression evaluation  */
-static int cmd_p(char *args) {
-	bool success;
-
-	if(args) {
-		uint32_t r = expr(args, &success);
-		if(success) { printf("0x%08x(%d)\n", r, r); }
-		else { printf("Bad expression\n"); }
-	}
-	return 0;
-}
-
-/* Add set watchpoint  */
-static int cmd_w(char *args) {
-	if(args) {
-		int NO = set_watchpoint(args);
-		if(NO != -1) { printf("Set watchpoint #%d\n", NO); }
-		else { printf("Bad expression\n"); }
-	}
-	return 0;
-}
-
-/* Add delete watchpoint */
-static int cmd_d(char *args) {
-	int NO;
-	sscanf(args, "%d", &NO);
-	if(!delete_watchpoint(NO)) {
-		printf("Watchpoint #%d does not exist\n", NO);
-	}
-
-	return 0;
-}
-
 static int cmd_c(char *args) {
 	cpu_exec(-1);
 	return 0;
@@ -131,6 +41,98 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
+static int cmd_si(char *args)
+{
+	char *arg = strtok(NULL, " ");
+	if(arg==NULL)//单步执行
+	{
+		cpu_exec(1);
+	}
+	else
+	{
+		if(*arg<'0'||*arg>'9')
+		{
+			printf("输入格式不对");
+			return 0;
+		}
+		int n=atoi(arg);
+		cpu_exec(n);
+	}
+	return 0;
+}
+
+static int cmd_info(char *args)
+{
+	char *arg = strtok(NULL, " ");
+	if(arg==NULL)
+	{
+		printf("Unknown command \n");	
+	}
+	else if(*arg=='r')
+	{
+		int i;
+		for( i=0;i<8;i++)
+		{
+			printf("%s\t%#010x\t%d\n",regsl[i],cpu.gpr[i]._32,cpu.gpr[i]._32);
+		}
+		printf("eip\t%#010x\t%d\n",cpu.eip,cpu.eip);
+	}
+	else if(*arg=='w')
+	{
+		show_watchpoint();
+	}
+	return 0;
+}
+static int cmd_x(char *args)
+{
+	int i=0;
+	if(args)
+	{
+		char* num=strtok(NULL," ");
+		char* exprs=strtok(NULL,".");
+		int n=atoi(num);
+		bool success=false;
+		int address=expr(exprs,&success);
+		for(i=0;i<n;i++)
+		{
+			printf("%#010x\t",swaddr_read(address + i * 4,4));
+			if(i%4==3&&i!=n)	
+				printf("\n");
+		}
+		printf("\n");
+		return 0;
+	}
+	printf("Unknown command\n");
+	return	0;
+}
+static int cmd_p(char* args)
+{
+	bool success=false;
+	int ans=expr(args,&success);
+	printf("%d\n",ans);
+	return 0;
+}
+static int cmd_w(char* args)
+{
+	WP* wp=new_wp();
+	if(wp==NULL)
+	{
+		return 0;
+	}
+	printf("Set watchpoint #%d",wp->NO);
+	strcpy(wp->exprs,args);
+	bool success=false;
+	wp->old_value=expr(args,&success);
+	return 0;
+}
+static int cmd_d(char* args)
+{
+	char* arg=strtok(NULL," ");
+	int no=atoi(arg);
+	if(!delete_watchpoint(no))
+		printf("Watchpoint #%d does not exist\n",no);
+	return 0;
+}
 static struct {
 	char *name;
 	char *description;
@@ -138,15 +140,14 @@ static struct {
 } cmd_table [] = {
 	{ "help", "Display informations about all supported commands", cmd_help },
 	{ "c", "Continue the execution of the program", cmd_c },
-	{ "q", "Exit NEMU", cmd_q }, 
-
+	{ "q", "Exit NEMU", cmd_q },
+	{ "si", "单步执行", cmd_si },
+	{ "info", "-r 打印寄存器状态  -w 打印监视点状态", cmd_info},
+	{ "x", "-n -expr 求出expr的值，并将其结果作为内存起始地址输出后面连续的n个四字节", cmd_x},
+	{"p","-expr 求出表达式 EXPR 的值",cmd_p},
+	{"w","-expr 当表达式expr的值发生变化时，暂停程序",cmd_w},
+	{"d","-NO 删除序号为NO监视点",cmd_d},
 	/* TODO: Add more commands */
-        { "si", "Single step", cmd_si },
-        { "info", "info r - print register values; info w - show watch point state", cmd_info },
-	{ "x", "Examine memory", cmd_x },
-        { "p", "Evaluate the value of expression", cmd_p },
-	{ "w", "Set watchpoint", cmd_w },
-	{ "d", "Delete watchpoint", cmd_d }
 
 };
 
