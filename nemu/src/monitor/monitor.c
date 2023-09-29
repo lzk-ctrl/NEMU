@@ -1,4 +1,5 @@
 #include "nemu.h"
+#include "memory/cache.h"
 
 #define ENTRY_START 0x100000
 
@@ -38,6 +39,9 @@ void init_monitor(int argc, char *argv[]) {
 	/* Initialize the watchpoint pool. */
 	init_wp_pool();
 
+  /* Initialize the cahce */
+  init_cache();
+
 	/* Display welcome message. */
 	welcome();
 }
@@ -74,12 +78,7 @@ static void load_entry() {
 	fclose(fp);
 }
 
-static void init_eflags(){
-	cpu.eflags.val = 0x00000002;
-}
-
 void restart() {
-	init_eflags();
 	/* Perform some initialization to restart a program */
 #ifdef USE_RAMDISK
 	/* Read the file with name `argv[1]' into ramdisk. */
@@ -91,6 +90,7 @@ void restart() {
 
 	/* Set the initial instruction pointer. */
 	cpu.eip = ENTRY_START;
+  cpu.eflags.val = 0x00000002;
 
 	/* Initialize DRAM. */
 	init_ddr3();

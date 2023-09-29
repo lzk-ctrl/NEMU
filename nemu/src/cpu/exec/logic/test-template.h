@@ -8,7 +8,7 @@ static void do_execute () {
     cpu.eflags.ZF = !ret;
     cpu.eflags.CF = 0;
     cpu.eflags.OF = 0;
-    ret ^= ret >> 4;//ret=ret^ret>>4
+    ret ^= ret >> 4;
     ret ^= ret >> 2;
     ret ^= ret >> 1;
     ret &= 1;
