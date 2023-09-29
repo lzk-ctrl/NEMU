@@ -1,30 +1,37 @@
 #include "common.h"
-#include "memory/cache.h"
+#include "cache.h"
 #include "cpu/reg.h"
+
 uint32_t dram_read(hwaddr_t, size_t);
 void dram_write(hwaddr_t, size_t, uint32_t);
 
 /* Memory accessing interfaces */
 
-uint32_t hwaddr_read(hwaddr_t addr, size_t len) {
-	uint32_t offset = addr & (CACHE_BLOCK - 1);
+uint32_t hwaddr_read(hwaddr_t addr, size_t len)
+{
+
+	uint32_t offset = addr & (BLOCK_SIZE - 1); 
 	uint32_t block = cache_read(addr);
 	uint8_t temp[4];
 	memset(temp, 0, sizeof(temp));
-	if (offset + len >= CACHE_BLOCK) {
-		uint32_t second_block = cache_read(addr + len);
-		memcpy(temp, cache[block].byte + offset, CACHE_BLOCK - offset);
-		memcpy(temp + CACHE_BLOCK - offset, cache[second_block].byte, len - (CACHE_BLOCK - offset));
-	} else {
-		memcpy(temp, cache[block].byte + offset, len);
+
+	if (offset + len >= BLOCK_SIZE)
+	{
+		uint32_t _block = cache_read(addr + len);
+		memcpy(temp, cache[block].data + offset, BLOCK_SIZE - offset);
+		memcpy(temp + BLOCK_SIZE - offset, cache[_block].data, len - (BLOCK_SIZE - offset));
+	}
+	else
+	{
+		memcpy(temp, cache[block].data + offset, len);
 	}
 	int zero = 0;
-	uint32_t result = unalign_rw(temp + zero, 4) & (~0u >> ((4 - len) << 3));
-	//printf("time: %ld\n", cnt);
-	return result;
+	uint32_t tmp = unalign_rw(temp + zero, 4) & (~0u >> ((4 - len) << 3));
+	return tmp;
 }
 
-void hwaddr_write(hwaddr_t addr, size_t len, uint32_t data) {
+void hwaddr_write(hwaddr_t addr, size_t len, uint32_t data)
+{
 	cache_write(addr, len, data);
 }
 
@@ -36,26 +43,17 @@ void lnaddr_write(lnaddr_t addr, size_t len, uint32_t data) {
 	hwaddr_write(addr, len, data);
 }
 
-
-lnaddr_t seg_translate(swaddr_t addr, size_t len, uint8_t sreg_id) {
-  if (cpu.cr0.protect_enable == 0) return addr;
-  else {
-    return cpu.sreg[sreg_id].base + addr;
-  }
-}
-
 uint32_t swaddr_read(swaddr_t addr, size_t len) {
 #ifdef DEBUG
-  assert(len == 1 || len == 2 || len == 4);
+	assert(len == 1 || len == 2 || len == 4);
 #endif
-  lnaddr_t lnaddr = seg_translate(addr, len, current_sreg);
-  return lnaddr_read(lnaddr, len);
+	return lnaddr_read(addr, len);
 }
 
 void swaddr_write(swaddr_t addr, size_t len, uint32_t data) {
 #ifdef DEBUG
-  assert(len == 1 || len == 2 || len == 4);
+	assert(len == 1 || len == 2 || len == 4);
 #endif
-  lnaddr_t lnaddr = seg_translate(addr, len, current_sreg);
-  lnaddr_write(lnaddr, len, data);
+	lnaddr_write(addr, len, data);
 }
+

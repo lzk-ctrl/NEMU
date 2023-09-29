@@ -81,11 +81,17 @@ void load_elf_tables(int argc, char *argv[]) {
 	fclose(fp);
 }
 
-uint32_t getValue(char* str,bool* success){
+uint32_t GetMarkValue(char* str,bool* success){
+
 	int i;
 	for (i = 0; i < nr_symtab_entry; i++){
-		if ((symtab[i].st_info & 0xf) == STT_OBJECT || (symtab[i].st_info & 0xf) == STT_FUNC){ 
-			if (strcmp(strtab + symtab[i].st_name, str) == 0){ 
+		if ((symtab[i].st_info & 0xf) == STT_OBJECT){
+			char syb[32];
+			int stlen = strlen(str);
+			strncpy(syb,strtab + symtab[i].st_name,stlen);
+			syb [stlen] = '\0';
+			if (strcmp(syb,str) == 0){
+				*success = true;
 				return symtab[i].st_value;
 			} 
 		}
@@ -94,14 +100,16 @@ uint32_t getValue(char* str,bool* success){
 	return 0;
 }
 
-char* getFuncName(swaddr_t eip) {
+void get_func_name(swaddr_t *current_addr,char *name)
+{
 	int i;
-	for(i = 0; i < nr_symtab_entry; i ++) {
-		if((symtab[i].st_info & 0xf) == STT_FUNC ){
-				if(eip >= symtab[i].st_value && eip <= symtab[i].st_value + symtab[i].st_size)  {
-				return strtab + symtab[i].st_name;
-		}
+	for(i=0;i<nr_symtab_entry;i++){
+		if(((symtab[i].st_info&0xf)==STT_FUNC) &&( symtab[i].st_value<*current_addr)&&(symtab[i].st_value+symtab[i].st_size>=*current_addr)){
+			int len=strlen(strtab+symtab[i].st_name);
+			strncpy(name,strtab+symtab[i].st_name,len);
+			name[len]='\0';
+			return;
 		}
 	}
-	return 0;
+	name[0]='\0';
 }
