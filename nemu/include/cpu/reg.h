@@ -107,6 +107,14 @@ typedef struct{
   };
 } Sreg_Descriptor;
 
+typedef struct {
+    uint32_t val;  // 存储页表或页目录中的32位数值
+    uint32_t p;  
+    uint32_t addr;  
+} Page_Descriptor;
+
+
+
 Sreg_Descriptor *sreg_desc;
 void sreg_load(uint8_t);
 uint8_t current_sreg;
