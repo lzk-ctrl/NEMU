@@ -1,45 +1,73 @@
 #include "FLOAT.h"
+#include <stdint.h>
+
+typedef union{
+	struct{
+		uint32_t m : 23;
+		uint32_t e : 8;
+		uint32_t s : 1;
+	};
+
+	uint32_t val;
+}Float;
+
+#define _sign(x) ((x) & 0x80000000)
 
 FLOAT F_mul_F(FLOAT a, FLOAT b) {
-	long long c = (long long)a * (long long)b;
-	return (FLOAT)(c >> 16);
+	int64_t scale = ((int64_t)a * (int64_t)b) >> 16;
+	return scale;
 }
 
 FLOAT F_div_F(FLOAT a, FLOAT b) {
-	FLOAT p, q;
-	asm volatile("idiv %2" : "=a"(p), "=d"(q) : "r"(b), "a"(a << 16), "d"(a >> 16));
-	return p;
+	/* Dividing two 64-bit integers needs the support of another library
+	 * `libgcc', other than newlib. It is a dirty work to port `libgcc'
+	 * to NEMU. In fact, it is unnecessary to perform a "64/64" division
+	 * here. A "64/32" division is enough.
+	 *
+	 * To perform a "64/32" division, you can use the x86 instruction
+	 * `div' or `idiv' by inline assembly. We provide a template for you
+	 * to prevent you from uncessary details.
+	 *
+	 *     asm volatile ("??? %2" : "=a"(???), "=d"(???) : "r"(???), "a"(???), "d"(???));
+	 *
+	 * If you want to use the template above, you should fill the "???"
+	 * correctly. For more information, please read the i386 manual for
+	 * division instructions, and search the Internet about "inline assembly".
+	 * It is OK not to use the template above, but you should figure
+	 * out another way to perform the division.
+	 */
+
+	FLOAT q, r;
+	__asm__ __volatile__("idiv %2" 
+							: "=a"(q), "=d"(r) 
+							: "r"(b), "a"(a << 16), "d"(a >> 16));
+	return q;
 }
 
 FLOAT f2F(float a) {
-	int b = *(int *)&a;
-	int sign = b >> 31;
-	int exp = (b >> 23) & 0xff;
-	FLOAT c = b & 0x7fffff;
-	if (exp != 0) {
-		c += 1 << 23;
-	}
-	exp -= 150;
-	if (exp < -16) {
-		c >>= -16 - exp;
-	}
-	if (exp > -16) {
-		c <<= exp + 16;
-	}
-	return sign == 0 ? c : -c;
+	/* You should figure out how to convert `a' into FLOAT without
+	 * introducing x87 floating point instructions. Else you can
+	 * not run this code in NEMU before implementing x87 floating
+	 * point instructions, which is contrary to our expectation.
+	 *
+	 * Hint: The bit representation of `a' is already on the
+	 * stack. How do you retrieve it to another variable without
+	 * performing arithmetic operations on it directly?
+	 */
+
+	Float f;
+	void *temp = &a;
+	f.val = *(uint32_t *)temp;
+	uint32_t m = f.m | (1 << 23);
+	int shift = 134 - (int)f.e;
+	if(shift < 0) m <<= (-shift);
+	else m >>= shift;
+	return (_sign(f.val) ? -m : m);
 }
 
 FLOAT Fabs(FLOAT a) {
-	FLOAT b;
-	if (a > 0){
-		b = a;
-	} else {
-		b = -a;
-
-	}
-	return b;
+	return _sign(a) ? -(a) : (a);
 }
-// ...
 
 /* Functions below are already implemented */
 

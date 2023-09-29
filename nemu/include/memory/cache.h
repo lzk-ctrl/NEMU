@@ -1,32 +1,52 @@
-#ifndef __CACHE__
-#define __CACHE__
+#ifndef __CACHE_H__
+#define __CACHE_H__
 
-typedef struct CacheLine
-{
+#include "common.h"
+
+#define CACHE_BLOCK_BIT 6
+#define CACHE_L1_WAY_BIT 3
+#define CACHE_L1_SET_BIT 7
+#define CACHE_L2_WAY_BIT 4
+#define CACHE_L2_SET_BIT 12
+#define CACHE_L2_CAP (4 * 1024 * 1024)
+#define CACHE_L1_CAP (64 * 1024)
+
+#define CACHE_BLOCK_SIZE (1 << CACHE_BLOCK_BIT)
+#define CACHE_L1_WAY_NUM (1 << CACHE_L1_WAY_BIT)
+#define CACHE_L1_SET_NUM (1 << CACHE_L1_SET_BIT)
+
+#define CACHE_L2_WAY_NUM (1 << CACHE_L2_WAY_BIT)
+#define CACHE_L2_SET_NUM (1 << CACHE_L2_SET_BIT)
+
+typedef struct{
+    uint8_t data[CACHE_BLOCK_SIZE];
     uint32_t tag;
-    bool valid;
-    bool dirty;
-    uint8_t *data;
-} CacheLine;
+    bool validVal;
+} L1;
 
-typedef struct Cache
-{
-    int blockSize;
-    int size;
-    int blockBit;
-    int groupBit;
-    int wayBit;
-    int groupSize;
-    int waySize;
-    CacheLine *lines;
+L1 cache_L1[CACHE_L1_SET_NUM * CACHE_L1_WAY_NUM];
 
-} Cache;
+void init_cache();
 
-void initCache();
-int read_cacheL1(hwaddr_t addr);
-int read_cacheL2(hwaddr_t addr);
-void write_cacheL2(hwaddr_t addr, size_t len, uint32_t data);
-void write_cacheL1(hwaddr_t addr,size_t len,uint32_t data);
-extern struct Cache cacheL2;
-extern struct Cache cacheL1;
+int read_cache_L1(hwaddr_t);
+
+void write_cache_L1(hwaddr_t, size_t, uint32_t);
+
+
+typedef struct{
+    uint8_t data[CACHE_BLOCK_SIZE];
+    uint32_t tag;
+    bool validVal;
+    bool dirtyVal;
+} L2;
+
+L2 cache_L2[CACHE_L2_SET_NUM * CACHE_L2_WAY_NUM];
+
+void init_cache();
+
+int read_cache_L1(hwaddr_t);
+int read_cache_L2(hwaddr_t);
+
+void write_cache_L1(hwaddr_t, size_t, uint32_t);
+void write_cache_L2(hwaddr_t, size_t, uint32_t);
 #endif

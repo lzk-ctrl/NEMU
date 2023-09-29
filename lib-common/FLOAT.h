@@ -6,20 +6,19 @@
 typedef int FLOAT;
 
 static inline int F2int(FLOAT a) {
-	a&=0xffff0000;
-	return a>>16;
+	return a >> 16;
 }
 
 static inline FLOAT int2F(int a) {
-	return a<<16;
+	return 	a << 16;
 }
 
 static inline FLOAT F_mul_int(FLOAT a, int b) {
-	return a*b;
+	return a * b;
 }
 
 static inline FLOAT F_div_int(FLOAT a, int b) {
-	return a/b;
+	return a / b;
 }
 
 FLOAT f2F(float);
@@ -33,5 +32,4 @@ FLOAT pow(FLOAT, FLOAT);
 #define FLOAT_ARG(f) (long long)f
 
 void init_FLOAT_vfprintf(void);
-
 #endif

@@ -1,4 +1,5 @@
 #include "cpu/exec/helper.h"
+
 #define DATA_BYTE 1
 #include "jge-template.h"
 #undef DATA_BYTE
@@ -12,3 +13,4 @@
 #undef DATA_BYTE
 
 make_helper_v(jge_i)
+
