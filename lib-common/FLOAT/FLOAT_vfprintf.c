@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "FLOAT.h"
+#include <sys/mman.h>
 
 extern char _vfprintf_internal;
 extern char _fpmaxtostr;
@@ -17,32 +18,29 @@ __attribute__((used)) static int format_FLOAT(FILE *stream, FLOAT f) {
 	 */
 
 	char buf[80];
-	int flag=(f>>31)&0x1;
-	if(flag) f=-f;
-	int num_before_point=f>>16;
-	int num_after_point=0;
-	int len;
-/* 	int temp=(f&0xffff);
-	int i=6;
-	while(i--) {
-		temp=temp*10;
-		num_after_point+=temp/65536;
-		temp%=65536;
-		num_after_point*=10;
-	}
-	num_after_point/=10;*/
-	int base=10000000;
+	int op = (f >> 31) & 0x1;
+	if (op) f = (~f) + 1;
+
+
+	int frac = 0;
 	int i;
-	for(i=15;i>=0;i--) {
-		base>>=1;
-		if(f&(1<<i)) {
-			num_after_point+=base;
+	int base=100000000;//Accuracy
+	for (i = 15; i >= 0;i--){
+		base >>= 1;
+		if (f&(1<<i)){
+			frac += base;
 		}
 	}
-	while(num_after_point>999999)num_after_point/=10;
+	int num = f >> 16;
+	int len = 0;
+	while (frac > 999999) frac /= 10;
+	if (op){
+		len = sprintf(buf,"-%d.%06d",num,frac);
+	}else {
+		len = sprintf(buf,"%d.%06d",num,frac);
+	}
 
-	if(flag) len = sprintf(buf, "-%d.%06d", num_before_point,num_after_point);
-	else len = sprintf(buf, "%d.%06d", num_before_point,num_after_point);
+	//int len = sprintf(buf, "0x%08x", f);
 	return __stdio_fwrite(buf, len, stream);
 }
 
@@ -52,30 +50,35 @@ static void modify_vfprintf() {
 	 * is the code section in _vfprintf_internal() relative to the
 	 * hijack.
 	 */
-	int start=(int)(&_vfprintf_internal);
-        int* call_pos=(int*)(start+0x307);
-	*call_pos+=((int)(format_FLOAT)-(int)(&_fpmaxtostr));
+	int addr = (int)(&_vfprintf_internal);
 
-	char* hijack;
-	hijack=(char*)(start+0x306-0x22);
-	*hijack=0x90;
-	hijack=(char*)(start+0x306-0x21);
-	*hijack=0x90;
-	hijack=(char*)(start+0x306-0x1e);
-	*hijack=0x90;
-	hijack=(char*)(start+0x306-0x1d);
-	*hijack=0x90;
+	// mprotect((void*)((addr + 0x306 - 100) & 0xfffff000), 4096*2, PROT_READ|PROT_WRITE|PROT_EXEC);
 
-	hijack=(char*)(start+0x306-0xb);
-	*hijack=0x08;
-	
-	hijack=(char*)(start+0x306-0xa);
-	*hijack=0xff;
-	hijack=(char*)(start+0x306-0x9);
-	*hijack=0x32;
-	hijack=(char*)(start+0x306-0x8);
-	*hijack=0x90;
+	//fstpt -> push
+	char *hijack = (char*)(addr + 0x306 - 0xa);
+	*hijack = 0xff;//push m32
+	hijack = (char*)(addr + 0x306 - 0x9);
+	*hijack = 0x32;//ModR/M: 00 110 010
+	hijack = (char*)(addr + 0x306 - 0x8);
+	*hijack = 0x90;//nop
 
+	hijack = (char*)(addr + 0x306 - 0xb);
+	*hijack = 0x08;//sub 0x8,%esp
+
+	hijack = (char*)(addr + 0x306 - 0x22);
+	*hijack = 0x90;//fldt -> nop
+
+	hijack = (char*)(addr + 0x306 - 0x21);
+	*hijack = 0x90;//fldt -> nop
+
+	hijack = (char*)(addr + 0x306 - 0x1e);
+	*hijack = 0x90;//fldl -> nop
+
+	hijack = (char*)(addr + 0x306 - 0x1d);
+	*hijack = 0x90;//fldl -> nop
+
+	int *pos = (int*)(addr + 0x307);
+	*pos += (int)format_FLOAT-(int)(&_fpmaxtostr);
 #if 0
 	else if (ppfs->conv_num <= CONV_A) {  /* floating point */
 		ssize_t nf;
@@ -101,7 +104,7 @@ static void modify_vfprintf() {
 	 */
 
 #if 0
-	else if (p9pfs->conv_num <= CONV_A) {  /* floating point */
+	else if (ppfs->conv_num <= CONV_A) {  /* floating point */
 		ssize_t nf;
 		nf = format_FLOAT(stream, *(FLOAT *) *argptr);
 		if (nf < 0) {
@@ -122,14 +125,13 @@ static void modify_ppfs_setargs() {
 	 * the modification.
 	 */
 
-	int start=(int)(&_ppfs_setargs);
-	char* hijack;
-	hijack=(char*)(start+0x71);
-	*hijack=0xeb;
-	hijack=(char*)(start+0x72);
-	*hijack=0x30;
-	hijack=(char*)(start+0x73);
-	*hijack=0x90;
+	int addr = (int)(&_ppfs_setargs);
+	char *hijack = (char*)(addr + 0x71);
+	*hijack = 0xeb;
+	hijack = (char*)(addr + 0x72);
+	*hijack = 0x30;
+	hijack = (char*)(addr + 0x73);
+	*hijack = 0x90;
 
 #if 0
 	enum {                          /* C type: */

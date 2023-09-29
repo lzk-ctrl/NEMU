@@ -12,4 +12,6 @@
 #include "jbe-template.h"
 #undef DATA_BYTE
 
-make_helper_v(jbe_i);
+/* for instruction encoding overloading */
+
+make_helper_v(jbe_i)

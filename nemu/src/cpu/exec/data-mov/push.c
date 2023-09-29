@@ -1,5 +1,4 @@
 #include "cpu/exec/helper.h"
-
 #define DATA_BYTE 1
 #include "push-template.h"
 #undef DATA_BYTE
@@ -12,7 +11,6 @@
 #include "push-template.h"
 #undef DATA_BYTE
 
-make_helper(concat(push_si,_b));
-make_helper_v(push_i);
-make_helper_v(push_r);
-make_helper_v(push_rm);
+make_helper_v(push_rm)
+make_helper_v(push_r)
+make_helper_v(push_i)

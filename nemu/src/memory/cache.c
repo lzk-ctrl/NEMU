@@ -1,139 +1,139 @@
-#include "common.h"
+#include "nemu.h"
 #include "memory/cache.h"
-#include "burst.h"
 #include <time.h>
+#include "burst.h"
 #include <stdlib.h>
 
-void cache_read_replace(hwaddr_t, void*);
-void cache_write_replace(hwaddr_t, void*, uint8_t*);
-void dram_write(hwaddr_t, size_t, uint32_t);
-
 void init_cache() {
-	int i;
-	for(i=0;i<L1_cache_S*L1_cache_E;i++) {
-		cache_L1[i].valid=false;
-	}
-	for(i=0;i<L2_cache_S*L2_cache_E;i++) { 
-		cache_L2[i].valid=false;
-		cache_L2[i].dirty=false;
-	}
-	return;
+  int i;
+  for (i = 0; i < CACHE_L1_SET_NUM * CACHE_L1_WAY_NUM; i++) {
+    cache_L1[i].validVal = false;
+  }
+  for (i = 0; i < CACHE_L2_SET_NUM * CACHE_L2_WAY_NUM; i++) {
+    cache_L2[i].dirtyVal = false;
+    cache_L2[i].validVal = false;
+  }
+  return;
 }
 
-int read_L1_cache(hwaddr_t aim) {
-	uint32_t tag=aim>>(L1_cache_s_bits+cache_b_bits);
-	uint32_t group=(aim>>cache_b_bits)&(L1_cache_S-1);
-	//uint32_t es_bias=(aim>>L1_cache_b_bits)<<L1_cache_b_bits;
-	int i;
-	//printf("aim: %08x    tag: %u   group: %u\n",aim,tag,group);
-	for(i=group*L1_cache_E;i<L1_cache_E+group*L1_cache_E;i++) {
-		if(cache_L1[i].valid==0) continue;
-		if(cache_L1[i].tag==tag) 
-			return i;
-	}
-	for(i=group*L1_cache_E;i<L1_cache_E+group*L1_cache_E;i++) {
-		if(cache_L1[i].valid==0) break;
-	}
-	if(i==L1_cache_E+group*L1_cache_E) {
-		srand(time(0));
-		i=rand()%L1_cache_E+group*L1_cache_E;
-	}
-	int temp=read_L2_cache(aim);
-	memcpy(cache_L1[i].data,cache_L2[temp].data,cache_B);
-	//uint32_t j;
-	//for(j=0;j<L1_cache_B/BURST_LEN;j++) {
-	//	cache_read_replace(es_bias+BURST_LEN*j,L1_cache[group][i].data+BURST_LEN*j);
-	//}
-	//printf("NO HIT group: %u   i: %u   tag: %u\n",group,i,tag);
-	cache_L1[i].valid=true;
-	cache_L1[i].tag=tag;
-	return i;
+void ddr3_read_me(hwaddr_t addr, void* data);
+
+// return whole index of way in cacheL1
+int read_cache_L1(hwaddr_t addr) {
+  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L1_SET_NUM - 1));
+  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L1_SET_BIT));
+  // uint32_t block_start = ((addr >> CACHE_BLOCK_BIT) << CACHE_BLOCK_BIT);
+
+  int wayIndex;
+  int whole_begin_wayIndex = setIndex * CACHE_L1_WAY_NUM;
+  int whole_end_wayIndex = (setIndex + 1) * CACHE_L1_WAY_NUM;
+  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++)
+    if (cache_L1[wayIndex].validVal && cache_L1[wayIndex].tag == tag) // Hit!
+      return wayIndex;
+  // Hit loss!
+  // go to cacheL2
+  srand(time(0));
+  int wayIndex_L2 = read_cache_L2(addr);
+  wayIndex = whole_begin_wayIndex + rand() % CACHE_L1_WAY_NUM;
+  memcpy(cache_L1[wayIndex].data, cache_L2[wayIndex_L2].data, CACHE_BLOCK_SIZE);
+
+  cache_L1[wayIndex].validVal = true;
+  cache_L1[wayIndex].tag = tag;
+  return wayIndex;
 }
 
-int read_L2_cache(hwaddr_t aim) {
-	uint32_t tag=aim>>(L2_cache_s_bits+cache_b_bits);
-	uint32_t group=(aim>>cache_b_bits)&(L2_cache_S-1);
-	uint32_t es_bias=(aim>>cache_b_bits)<<cache_b_bits;
-	int i;
-	//printf("aim: %08x    tag: %u   group: %u\n",aim,tag,group);
-	for(i=group*L2_cache_E;i<L2_cache_E+group*L2_cache_E;i++) {
-		if(cache_L2[i].valid==0) continue;
-		if(cache_L2[i].tag==tag) 
-			return i;
-	}
-	for(i=group*L2_cache_E;i<L2_cache_E+group*L2_cache_E;i++) {
-		if(cache_L2[i].valid==0) break;
-	}
-	if(i==L2_cache_E+group*L2_cache_E) {
-		srand(time(0));
-		i=rand()%L2_cache_E+group*L2_cache_E;
-	}
-	if(cache_L2[i].valid==1 && cache_L2[i].dirty==1) {
-		uint8_t temp[2*BURST_LEN];
-		uint32_t es_bias_change=(cache_L2[i].tag<<(L2_cache_s_bits+cache_b_bits)) | (group<<cache_b_bits);
-		memset(temp,1,sizeof(temp));
-		int h;
-		for(h=0;h<cache_B/BURST_LEN;h++) {
-			cache_write_replace(es_bias_change+BURST_LEN*h,cache_L2[i].data+BURST_LEN*h,temp);
-		}
-	}
-	int j;
-	for(j=0;j<cache_B/BURST_LEN;j++) {
-		cache_read_replace(es_bias+BURST_LEN*j,cache_L2[i].data+BURST_LEN*j);
-	}
-	//printf("NO HIT group: %u   i: %u   tag: %u\n",group,i,tag);
-	cache_L2[i].valid=true;
-	cache_L2[i].dirty=false;
-	cache_L2[i].tag=tag;
-	return i;
+void ddr3_write_me(hwaddr_t addr, void* data, uint8_t* mask);
+
+// return whole index of way in cacheL2
+int read_cache_L2(hwaddr_t addr) {
+  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L2_SET_NUM - 1));
+  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L2_SET_BIT));
+  uint32_t block_start = ((addr >> CACHE_BLOCK_BIT) << CACHE_BLOCK_BIT);
+
+  int wayIndex;
+  int whole_begin_wayIndex = setIndex * CACHE_L2_WAY_NUM;
+  int whole_end_wayIndex = (setIndex + 1) * CACHE_L2_WAY_NUM;
+  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++)
+    if (cache_L2[wayIndex].validVal && cache_L2[wayIndex].tag == tag) return wayIndex; // Hit!
+  // Hit loss!
+  srand(time(0));
+  wayIndex = whole_begin_wayIndex + rand() % CACHE_L2_WAY_NUM;
+  int i;
+  if (cache_L2[wayIndex].validVal && cache_L2[wayIndex].dirtyVal) {
+    // write down
+    uint8_t tmp[BURST_LEN << 1];
+    memset(tmp, 1, sizeof(tmp));
+    uint32_t block_start_x = (cache_L2[wayIndex].tag << (CACHE_L2_SET_BIT + CACHE_BLOCK_BIT)) | (setIndex << CACHE_BLOCK_BIT);
+    for (i = 0; i < CACHE_BLOCK_SIZE / BURST_LEN; i++) {
+      ddr3_write_me(block_start_x + BURST_LEN * i, cache_L2[wayIndex].data + BURST_LEN * i, tmp);
+    }
+  }
+  for (i = 0; i < CACHE_BLOCK_SIZE / BURST_LEN; i++) {
+    ddr3_read_me(block_start + BURST_LEN * i, cache_L2[wayIndex].data + BURST_LEN * i);
+  }
+  cache_L2[wayIndex].validVal = true;
+  cache_L2[wayIndex].dirtyVal = false;
+  cache_L2[wayIndex].tag = tag;
+  return wayIndex;
 }
 
-void write_L1_cache(hwaddr_t aim,size_t len,uint32_t data) {
-	uint32_t tag=aim>>(L1_cache_s_bits+cache_b_bits);
-	uint32_t group=(aim>>cache_b_bits)&(L1_cache_S-1);
-	uint32_t bias=aim&(cache_B-1);
-	//printf("aim: %08x    tag: %u   group: %u\n",aim,tag,group);
-	int i;
-	for(i=group*L1_cache_E;i<L1_cache_E+group*L1_cache_E;i++) {
-		if(cache_L1[i].valid==0) continue;
-		if(cache_L1[i].tag==tag) {
-			dram_write(aim,len,data);
-			write_L2_cache(aim,len,data);
-			if(bias+len<=cache_B){
-				memcpy(cache_L1[i].data+bias,&data,len);
-			}
-			else {
-				memcpy(cache_L1[i].data+bias,&data,cache_B-bias);
-				write_L1_cache(aim+cache_B-bias,len-(cache_B-bias),data>>(cache_B-bias));
-			}
-			return;	
-		}
-	}
-	write_L2_cache(aim,len,data);
-	return;
+void dram_write(hwaddr_t addr, size_t len, uint32_t data);
+
+void write_cache_L1(hwaddr_t addr, size_t len, uint32_t data) {
+  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L1_SET_NUM - 1));
+  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L1_SET_BIT));
+  uint32_t block_bias = addr & (CACHE_BLOCK_SIZE - 1);
+  int wayIndex;
+  int whole_begin_wayIndex = setIndex * CACHE_L1_WAY_NUM;
+  int whole_end_wayIndex = (setIndex + 1) * CACHE_L1_WAY_NUM;
+  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++) {
+    if (cache_L1[wayIndex].validVal && cache_L1[wayIndex].tag == tag) {
+      // Hit!
+      // write through
+      if (block_bias + len > CACHE_BLOCK_SIZE) {
+        dram_write(addr, CACHE_BLOCK_SIZE - block_bias, data);
+        memcpy(cache_L1[wayIndex].data + block_bias, &data, CACHE_BLOCK_SIZE - block_bias);
+        write_cache_L2(addr, CACHE_BLOCK_SIZE - block_bias, data);
+        write_cache_L1(addr + CACHE_BLOCK_SIZE - block_bias, len - (CACHE_BLOCK_SIZE - block_bias), data >> (CACHE_BLOCK_SIZE - block_bias));
+      } else {
+        dram_write(addr, len, data);
+        memcpy(cache_L1[wayIndex].data + block_bias, &data, len);
+        write_cache_L2(addr, len, data);
+      }
+      return;
+    }
+  }
+  //  Hit loss!
+  // not write allocate
+  write_cache_L2(addr, len, data);
+  return;
 }
 
-void write_L2_cache(hwaddr_t aim,size_t len,uint32_t data) {
-	uint32_t tag=aim>>(L2_cache_s_bits+cache_b_bits);
-	uint32_t group=(aim>>cache_b_bits)&(L2_cache_S-1);
-	uint32_t bias=aim&(cache_B-1);
-	int i;
-	for(i=group*L2_cache_E;i<L2_cache_E+group*L2_cache_E;i++) {
-		if(cache_L2[i].valid==0) continue;
-		if(cache_L2[i].tag==tag) {
-			cache_L2[i].dirty=1;
-			if(bias+len<=cache_B)
-				memcpy(cache_L2[i].data+bias,&data,len);
-			else {
-				memcpy(cache_L2[i].data+bias,&data,cache_B-bias);
-				write_L2_cache(aim+cache_B-bias,len-(cache_B-bias),data>>(cache_B-bias));
-			}	
-			return;
-		}
-	}
-	int ans=read_L2_cache(aim);
-	cache_L2[ans].dirty=1;
-	memcpy(cache_L2[ans].data+bias,&data,len);
-	return;
+void write_cache_L2(hwaddr_t addr, size_t len, uint32_t data) {
+  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L2_SET_NUM - 1));
+  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L2_SET_BIT));
+  uint32_t block_bias = addr & (CACHE_BLOCK_SIZE - 1);
+  int wayIndex;
+  int whole_begin_wayIndex = setIndex * CACHE_L2_WAY_NUM;
+  int whole_end_wayIndex = (setIndex + 1) * CACHE_L2_WAY_NUM;
+  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++) {
+    if (cache_L2[wayIndex].validVal && cache_L2[wayIndex].tag == tag) {
+      // Hit!
+      // write back
+      cache_L2[wayIndex].dirtyVal = true;
+      if (block_bias + len > CACHE_BLOCK_SIZE) {
+        memcpy(cache_L2[wayIndex].data + block_bias, &data, CACHE_BLOCK_SIZE - block_bias);
+        write_cache_L2(addr + CACHE_BLOCK_SIZE - block_bias, len - (CACHE_BLOCK_SIZE - block_bias), data >> (CACHE_BLOCK_SIZE - block_bias));
+      } else {
+        memcpy(cache_L2[wayIndex].data + block_bias, &data, len);
+      }
+      return;
+    }
+  }
+  //  Hit loss!
+  // write allocate
+  wayIndex = read_cache_L2(addr);
+  cache_L2[wayIndex].dirtyVal = true;
+  memcpy(cache_L2[wayIndex].data + block_bias, &data, len);
+  return;
 }
-

@@ -12,4 +12,5 @@
 #include "jg-template.h"
 #undef DATA_BYTE
 
-make_helper_v(jg_i);
+make_helper_v(jg_i)
+

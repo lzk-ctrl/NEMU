@@ -2,15 +2,12 @@
 
 #define instr jns
 
-static void do_execute() {
-    DATA_TYPE_S bias=op_src->val;
-    print_asm(str(instr) " %x",cpu.eip+1+DATA_BYTE+bias);
-    if(cpu.eflags.SF==0) {
-        cpu.eip+=bias;
-        if(DATA_BYTE==2) cpu.eip=cpu.eip&0xffff;
-    }
+make_helper(concat(jns_i_, SUFFIX)) {
+  int len = concat(decode_i_, SUFFIX)(eip + 1);
+  print_asm("jns: 0x%x", (DATA_TYPE_S)op_src->imm + cpu.eip + len + 1);
+  if (cpu.eflags.SF == 0)
+    cpu.eip += (DATA_TYPE_S)op_src->imm;
+  return len + 1;
 }
-
-make_instr_helper(i)
 
 #include "cpu/exec/template-end.h"

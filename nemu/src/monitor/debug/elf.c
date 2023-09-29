@@ -8,6 +8,45 @@ static char *strtab = NULL;
 static Elf32_Sym *symtab = NULL;
 static int nr_symtab_entry;
 
+uint32_t getVariable(char* name, bool* success) {
+  *success = true;
+  int i;
+  for (i = 0; i < nr_symtab_entry; i++) {
+    if ((symtab[i].st_info & 0xf) == STT_OBJECT) {
+      char ls[50];
+      strcpy(ls, strtab + symtab[i].st_name);
+      if (strcmp(ls, name) == 0)
+        return symtab[i].st_value;
+    }
+  }
+  *success = false;
+  return 0;
+}
+
+void getTable() {
+  int i;
+  for (i = 0; i < nr_symtab_entry; i++) {
+    if ((symtab[i].st_info & 0xf) == STT_OBJECT) {
+      char ls[50];
+      strcpy(ls, strtab + symtab[i].st_name);
+      printf("%s\n", ls);
+    }
+  }
+}
+
+void getFrame(swaddr_t addr, char* s) {
+  int i;
+  for (i = 0; i < nr_symtab_entry; i++) {
+    int lslen;
+    if (symtab[i].st_value <= addr && symtab[i].st_value +  symtab[i].st_size >= addr && (symtab[i].st_info & 0xf) == STT_FUNC) {
+      lslen = symtab[i + 1].st_name - symtab[i].st_name - 1;
+      strncpy(s, strtab + symtab[i].st_name, lslen);
+      s [lslen] = '\0';
+      break;
+    }
+  }
+}
+
 void load_elf_tables(int argc, char *argv[]) {
 	int ret;
 	Assert(argc == 2, "run NEMU with format 'nemu [program]'");
@@ -80,41 +119,4 @@ void load_elf_tables(int argc, char *argv[]) {
 
 	fclose(fp);
 }
-
-uint32_t get_address(const char* name, bool* suc) {
-	int pos;
-	uint32_t ans;
-	for(pos=0;pos<nr_symtab_entry;pos++) {
-  		int type=symtab[pos].st_info&0xf;
-		if(type!=STT_OBJECT) continue;
-		//printf("pos: %d   bias: %d   type: %d\n", pos,symtab[pos].st_name,symtab[pos].st_info);
-		if(strcmp(strtab+symtab[pos].st_name,name)==0) {
-			ans=symtab[pos].st_value;
-			return ans;
-		}
-	}
-	*suc=false;
-	printf("Do not find this variable name!\n");
-	return 0;
-}
-void get_function(swaddr_t addr,char name[32], bool* suc) {
-	int pos;
-	for(pos=0;pos<nr_symtab_entry;pos++) {
-  		int type=symtab[pos].st_info&0xf;
-		if(type!=STT_FUNC) continue;
-		//printf("pos: %d   bias: %d   type: %d\n", pos,symtab[pos].st_name,symtab[pos].st_info);
-		swaddr_t start=symtab[pos].st_value;
-		swaddr_t end=symtab[pos].st_value+symtab[pos].st_size;
-		if(addr>=start&&addr<end) {
-			int length=strlen(strtab+symtab[pos].st_name);
-			strncpy(name,strtab+symtab[pos].st_name,length);
-			name[length]='\0';
-			return; 
-		}
-	}
-	*suc=false;
-	printf("the address %08x is not in function.\n",addr);
-	return;
-}
-
 

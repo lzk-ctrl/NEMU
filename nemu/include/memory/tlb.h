@@ -3,18 +3,17 @@
 
 #include "common.h"
 
-#define tlb_size 64
+#define TLB_SIZE 64
 
 typedef struct{
-	uint32_t page_num;
-	uint32_t tag;
-	bool valid;
-}tlb_struct;
+    bool valid_value;
+    uint32_t tag, page_num;
+} TLB;
 
-tlb_struct tlb[tlb_size];
+TLB tlb[TLB_SIZE];
 
 void init_tlb();
-int read_tlb(lnaddr_t);
-void write_tlb(lnaddr_t,hwaddr_t);
+int read_tlb(uint32_t addr);
+void write_tlb(uint32_t lnaddr, uint32_t hwaddr);
 
 #endif

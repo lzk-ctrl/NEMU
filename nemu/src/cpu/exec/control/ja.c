@@ -12,4 +12,4 @@
 #include "ja-template.h"
 #undef DATA_BYTE
 
-make_helper_v(ja_i);
+make_helper_v(ja_i)

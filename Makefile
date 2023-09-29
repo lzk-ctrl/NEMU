@@ -53,19 +53,14 @@ clean: clean-cpp
 
 ##### some convinient rules #####
 
-USERPROG := obj/testcase/hello-str
-#ENTRY := $(USERPROG)
+USERPROG := obj/testcase/add
 ENTRY := $(kernel_BIN)
-
 entry: $(ENTRY)
 	objcopy -S -O binary $(ENTRY) entry
 
 run: $(nemu_BIN) $(USERPROG) entry
 	$(call git_commit, "run")
 	$(nemu_BIN) $(USERPROG)
-
-count:
-	@find nemu -name "*[.h|.c]" | xargs grep "^." | wc -l 
 
 gdb: $(nemu_BIN) $(USERPROG) entry
 	$(call git_commit, "gdb")
@@ -77,5 +72,3 @@ test: $(nemu_BIN) $(testcase_BIN) entry
 
 submit: clean
 	cd .. && zip -r $(STU_ID).zip $(shell pwd | grep -o '[^/]*$$')
-
-

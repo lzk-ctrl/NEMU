@@ -12,4 +12,4 @@
 #include "jne-template.h"
 #undef DATA_BYTE
 
-make_helper_v(jne_i);
+make_helper_v(jne_i)

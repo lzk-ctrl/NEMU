@@ -72,10 +72,6 @@ static void ddr3_read(hwaddr_t addr, void *data) {
 	memcpy(data, rowbufs[rank][bank].buf + col, BURST_LEN);
 }
 
-void cache_read_replace(hwaddr_t addr,void* data){
-	ddr3_read(addr,data);
-}
-
 static void ddr3_write(hwaddr_t addr, void *data, uint8_t *mask) {
 	Assert(addr < HW_MEM_SIZE, "physical address %x is outside of the physical memory!", addr);
 
@@ -98,10 +94,6 @@ static void ddr3_write(hwaddr_t addr, void *data, uint8_t *mask) {
 
 	/* write back to dram */
 	memcpy(dram[rank][bank][row], rowbufs[rank][bank].buf, NR_COL);
-}
-
-void cache_write_replace(hwaddr_t addr,void* data, uint8_t *mask){
-	ddr3_write(addr,data,mask);
 }
 
 uint32_t dram_read(hwaddr_t addr, size_t len) {
@@ -133,4 +125,11 @@ void dram_write(hwaddr_t addr, size_t len, uint32_t data) {
 		/* data cross the burst boundary */
 		ddr3_write(addr + BURST_LEN, temp + BURST_LEN, mask + BURST_LEN);
 	}
+}
+
+void ddr3_read_me(hwaddr_t addr, void* data) {
+  ddr3_read(addr, data) ;
+}
+void ddr3_write_me(hwaddr_t addr, void* data, uint8_t* mask) {
+  ddr3_write(addr, data, mask) ;
 }

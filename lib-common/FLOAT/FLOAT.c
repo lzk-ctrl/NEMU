@@ -1,9 +1,21 @@
 #include "FLOAT.h"
+#include <stdint.h>
+
+typedef union{
+	struct{
+		uint32_t m : 23;
+		uint32_t e : 8;
+		uint32_t s : 1;
+	};
+
+	uint32_t val;
+}Float;
+
+#define _sign(x) ((x) & 0x80000000)
 
 FLOAT F_mul_F(FLOAT a, FLOAT b) {
-	long long temp=(long long)a*(long long)b;
-	FLOAT ans=(FLOAT)(temp>>=16);
-	return ans;
+	int64_t scale = ((int64_t)a * (int64_t)b) >> 16;
+	return scale;
 }
 
 FLOAT F_div_F(FLOAT a, FLOAT b) {
@@ -24,29 +36,12 @@ FLOAT F_div_F(FLOAT a, FLOAT b) {
 	 * It is OK not to use the template above, but you should figure
 	 * out another way to perform the division.
 	 */
-	if(b==0) nemu_assert(0);
-	int flag1=0,flag2=0;
- 	if(a<0) {
-		a=-a;
-		flag1=1;
-	}
-	if(b<0) {
-		b=-b;
-		flag2=1;
-	}
-	int ans=a/b;
-	int remain=a%b;
-	int i=16;
-	while(i--) {
-		ans<<=1;
-		remain<<=1;
-		if(remain>=b) {
-			ans+=(remain/b);
-			remain%=b;
-		}
-	}
-	if(flag1^flag2) ans=-ans;
-	return ans;
+
+	FLOAT q, r;
+	__asm__ __volatile__("idiv %2" 
+							: "=a"(q), "=d"(r) 
+							: "r"(b), "a"(a << 16), "d"(a >> 16));
+	return q;
 }
 
 FLOAT f2F(float a) {
@@ -60,29 +55,18 @@ FLOAT f2F(float a) {
 	 * performing arithmetic operations on it directly?
 	 */
 
-	int temp=*(int*)&a;
-	int flag=(temp>>31)&0x1;
-	int exp=(temp>>23)&0xff;
-    	int ans=temp&0x7fffff;
-	ans+=0x800000;
-	if(exp==0) return 0;
-	else if(exp==0xff) {
-		if(flag) return -0x7fffffff;
-		else return 0x7fffffff;
-	}
-	else {
-		exp-=127;
-		exp-=23;
-		if(exp>-16) ans<<=(exp+16);
-		else ans>>=(-exp-16);
-	}
-	if(flag) ans=-ans;
-	return ans;
+	Float f;
+	void *temp = &a;
+	f.val = *(uint32_t *)temp;
+	uint32_t m = f.m | (1 << 23);
+	int shift = 134 - (int)f.e;
+	if(shift < 0) m <<= (-shift);
+	else m >>= shift;
+	return (_sign(f.val) ? -m : m);
 }
 
 FLOAT Fabs(FLOAT a) {
-	if(a<0) a=-a;
-	return a;
+	return _sign(a) ? -(a) : (a);
 }
 
 /* Functions below are already implemented */
