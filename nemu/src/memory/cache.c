@@ -1,158 +1,177 @@
 #include "common.h"
-#include "burst.h"
-#include <stdlib.h>
 #include "memory/cache.h"
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "burst.h"
 
-uint32_t dram_read(hwaddr_t addr, size_t len);
-void call_ddr3_read(hwaddr_t, void *);
-void call_ddr3_write(hwaddr_t, void *, uint8_t *);
+// Cache_L1
+// #define Cache_L1_Size 64 * 1024
+// #define Cache_L1_Block_Size 64
+// #define Cache_L1_Way_Bit 3
+// #define Cache_L1_Group_Bit 7
+// #define Cache_L1_Block_Bit 6
+// #define Cache_L1_Group_Size 1 << Cache_L2_Group_Bit
+// #define Cache_L1_Way_Size 1 << Cache_L1_Way_Bit
 
-void init_cache()
-{
+// Cache_L2
+// #define Cache_L2_Size 4 * 1024 * 1024
+// #define Cache_L2_Block_Size 64
+// #define Cache_L2_Way_Bit 4
+// #define Cache_L2_Group_Bit 12
+// #define Cache_L2_Block_Bit 6
+// #define Cache_L2_Group_Size (1 << Cache_L2_Group_Bit)
+// #define Cache_L2_Way_Size (1 << Cache_L2_Way_Bit)
+
+void ddr3_read_replace(hwaddr_t addr, void *data);
+void dram_write(hwaddr_t addr, size_t len, uint32_t data);
+void ddr3_write_replace(hwaddr_t addr, void *data, uint8_t *mask);
+
+void init_cache(){
     int i;
-    for (i = 0; i < CACHE_SIZE_L1 / CACHE_BLOCK_SIZE; i++)
-    {
-        cache[i].valid = false;
-        cache[i].tag = 0;
-        memset(cache[i].data, 0, CACHE_BLOCK_SIZE);
+    for (i = 0;i < Cache_L1_Size / Cache_L1_Block_Size;i ++){
+        cache1[i].valid = 0;
     }
-    for (i = 0; i < CACHE_SIZE_L2 / CACHE_BLOCK_SIZE; i++)
-    {
-        cache2[i].valid = false;
-        cache2[i].dirty = false;
-        cache2[i].tag = 0;
-        memset(cache2[i].data, 0, CACHE_BLOCK_SIZE);
+    for (i = 0;i < Cache_L2_Size / Cache_L2_Block_Size;i ++){
+        cache2[i].valid = 0;
+        cache2[i].dirty = 0;
     }
-    //tol_time = 0;
+    test_time = 0;
 }
+int read_cache1(hwaddr_t addr){
+    uint32_t group_idx = (addr >> Cache_L1_Block_Bit) & (Cache_L1_Group_Size - 1);
+    uint32_t tag = (addr >> (Cache_L1_Group_Bit + Cache_L1_Block_Bit));
+    // uint32_t block_start = (addr >> Cache_L1_Block_Bit) << Cache_L1_Block_Bit;
 
-uint32_t cache_read(hwaddr_t addr)
-{
-    uint32_t gid = (addr >> 6) & 0x7f; //get group number
-    bool hit = false;
-    int i;
-    for (i = gid * EIGHT_WAY; i < (gid + 1) * EIGHT_WAY; i++)
-    {
-        if (cache[i].tag == (addr >> 13) && cache[i].valid)
-        {
-            hit = true; //hit
-            //printf("hit!");
-            //tol_time += 2;
-            break;
+    int i,group = group_idx * Cache_L1_Way_Size;
+    for (i = group + 0;i < group + Cache_L1_Way_Size;i ++){
+        if (cache1[i].valid == 1 && cache1[i].tag == tag){// READ HIT
+
+#ifdef Test
+            test_time += 2;//HIT in Cache1
+#endif
+            return i;
         }
     }
-    if (!hit)
-    { //not hit
-        int j = second_cache_read(addr);
-        for (i = gid * EIGHT_WAY; i < (gid + 1) * EIGHT_WAY; i++)
-        {
-            if (!cache[i].valid)
-                break; //find cache[i].valid=0;
-        }
-        if (i == (gid + 1) * EIGHT_WAY)
-        {
-            //random replacement algorism
-            srand(0);
-            i = gid * EIGHT_WAY + rand() % EIGHT_WAY;
-        }
-        cache[i].valid = true;
-        cache[i].tag = addr >> 13;
-        memcpy(cache[i].data, cache2[j].data, CACHE_BLOCK_SIZE);
-    }
+    
+    // Find in Cache2
+    int pl = read_cache2(addr);   
+    srand(time(0));
+    i = group + rand() % Cache_L1_Way_Size;
+    memcpy(cache1[i].data,cache2[pl].data,Cache_L1_Block_Size);
+
+
+    // Random (PA3 task1)
+// #ifdef Test
+//     test_time += 200;
+// #endif
+    // srand(time(0));
+    // i = group + rand() % Cache_L1_Way_Size;
+    // /*new content*/
+    // int j;
+    // for (j = 0;j < Cache_L1_Block_Size / BURST_LEN;j ++){
+    //     ddr3_read_replace(block_start + BURST_LEN * j, cache1[i].data + BURST_LEN * j);
+    // }
+    cache1[i].valid = 1;
+    cache1[i].tag = tag;
     return i;
 }
 
-uint32_t second_cache_read(hwaddr_t addr)
-{
-    uint32_t gid = (addr >> 6) & ((1 << 12) - 1); //get group number
-    uint32_t block = (addr >> 6) << 6;
-    int i;
-    bool hit = false;
-    for (i = gid * SIXTEEN_WAY; i < (gid + 1) * SIXTEEN_WAY; i++)
-    {
-        if (cache2[i].tag == (addr >> 18) && cache2[i].valid)
-        {
-            //hit
-            hit = true;
-            //printf("hit!");
-            //tol_time += 20;
-            break;
+int read_cache2(hwaddr_t addr){
+    uint32_t group_idx = (addr >> Cache_L2_Block_Bit) & (Cache_L2_Group_Size - 1);
+    uint32_t tag = (addr >> (Cache_L2_Group_Bit + Cache_L2_Block_Bit));
+    uint32_t block_start = (addr >> Cache_L2_Block_Bit) << Cache_L2_Block_Bit;
+
+    int i,group = group_idx * Cache_L2_Way_Size;
+    for (i = group + 0;i < group + Cache_L2_Way_Size;i ++){
+        if (cache2[i].valid == 1 && cache2[i].tag == tag){// READ HIT
+
+#ifdef Test
+            test_time += 10;//HIT in Cache2
+#endif
+            return i;
         }
     }
-    if (!hit)
-    {
-        //not hit
-        int j;
-        for (i = gid * SIXTEEN_WAY; i < (gid + 1) * SIXTEEN_WAY; i++)
-        {
-            if (!cache2[i].valid)
-                break;
+    // Random (PA3 optional task1)
+#ifdef Test
+        test_time += 200;//NOT HIT in Cache2
+#endif
+    srand(time(0));
+    i = group + rand() % Cache_L2_Way_Size;
+    /*write back*/
+    if (cache2[i].valid == 1 && cache2[i].dirty == 1){
+        uint8_t ret[BURST_LEN << 1];
+        uint32_t block_st = (cache2[i].tag << (Cache_L2_Group_Bit + Cache_L2_Block_Bit)) | (group_idx << Cache_L2_Block_Bit);
+        int w;
+        memset(ret,1,sizeof ret);
+        for (w = 0;w < Cache_L2_Block_Size / BURST_LEN; w++){
+            ddr3_write_replace(block_st + BURST_LEN * w, cache2[i].data + BURST_LEN * w,ret);
         }
-        if (i == (gid + 1) * SIXTEEN_WAY)
-        {
-            srand(0);
-            i = gid * SIXTEEN_WAY + rand() % SIXTEEN_WAY;
-            if (cache2[i].dirty)
-            {
-                uint8_t mask[BURST_LEN * 2];
-                memset(mask, 1, BURST_LEN * 2);
-                for (j = 0; j < CACHE_BLOCK_SIZE / BURST_LEN; j++)
-                {
-                    call_ddr3_write(block + j * BURST_LEN, cache2[i].data + j * BURST_LEN, mask);
-                }
+    }
+    /*new content*/
+    int j;
+    for (j = 0;j < Cache_L2_Block_Size / BURST_LEN;j ++){
+        ddr3_read_replace(block_start + BURST_LEN * j, cache2[i].data + BURST_LEN * j);
+    }
+    cache2[i].dirty = 0;
+    cache2[i].valid = 1;
+    cache2[i].tag = tag;
+    return i;
+}
+
+void write_cache1(hwaddr_t addr, size_t len, uint32_t data){
+    uint32_t group_idx = (addr >> Cache_L1_Block_Bit) & (Cache_L1_Group_Size - 1);
+    uint32_t tag = (addr >> (Cache_L1_Group_Bit + Cache_L1_Block_Bit));
+    uint32_t offset = addr & (Cache_L1_Block_Size - 1);
+
+    int i,group = group_idx * Cache_L1_Way_Size;
+    for (i = group + 0;i < group + Cache_L1_Way_Size;i ++){
+        if (cache1[i].valid == 1 && cache1[i].tag == tag){// WRITE HIT
+            /*write through*/
+            if (offset + len > Cache_L1_Block_Size){
+                dram_write(addr,Cache_L1_Block_Size - offset,data);
+                memcpy(cache1[i].data + offset, &data, Cache_L1_Block_Size - offset);
+                /*Update Cache2*/
+                write_cache2(addr,Cache_L1_Block_Size - offset,data);
+
+                write_cache1(addr + Cache_L1_Block_Size - offset,len - (Cache_L1_Block_Size - offset),data >>(8*(Cache_L1_Block_Size - offset)));
+            }else {
+                dram_write(addr,len,data);
+                memcpy(cache1[i].data + offset, &data, len);
+                /*Update Cache2*/
+                write_cache2(addr,len,data);
             }
+            return;
         }
-        cache2[i].valid = true;
-        cache2[i].tag = addr >> 18;
-        cache2[i].dirty = false;
-        for (j = 0; j < BURST_LEN; j++)
-        {
-            call_ddr3_read(block + j * BURST_LEN, cache2[i].data + j * BURST_LEN);
-        }
-        //tol_time += 200;
     }
-    return i;
+    // /*not write allocate*/
+    // PA3 task1
+    // dram_write(addr,len,data);
+
+    // PA3 optional task1
+    write_cache2(addr,len,data);
 }
 
-void cache_write(hwaddr_t addr, size_t len, uint32_t data)
-{
-    uint32_t gid = (addr >> 6) & 0x7f;
-    uint32_t offset = addr & (CACHE_BLOCK_SIZE - 1); //displacement addr
-    int i;
-    bool hit = false;
-    for (i = gid * EIGHT_WAY; i < (gid + 1) * EIGHT_WAY; i++)
-    {
-        if (cache[i].tag == (addr >> 13) && cache[i].valid)
-        {
-            hit = true;
-            break;
-        }
-    }
-    if (hit)
-    {
-        memcpy(cache[i].data + offset, &data, len);
-    }
-    second_cache_write(addr, len, data);
-}
+void write_cache2(hwaddr_t addr, size_t len, uint32_t data){
+    uint32_t group_idx = (addr >> Cache_L2_Block_Bit) & (Cache_L2_Group_Size - 1);
+    uint32_t tag = (addr >> (Cache_L2_Group_Bit + Cache_L2_Block_Bit));
+    uint32_t offset = addr & (Cache_L2_Block_Size - 1);
 
-void second_cache_write(hwaddr_t addr, size_t len, uint32_t data)
-{
-    uint32_t gid = (addr >> 6) & ((1 << 12) - 1);
-    uint32_t offset = addr & (CACHE_BLOCK_SIZE - 1);
-    bool hit = false;
-    int i;
-    for (i = gid * SIXTEEN_WAY; i < (gid + 1) * SIXTEEN_WAY; i++)
-    {
-        if (cache2[i].tag == (addr >> 13) && cache2[i].valid)
-        {
-            hit = true;
-            break;
+    int i,group = group_idx * Cache_L2_Way_Size;
+    for (i = group + 0;i < group + Cache_L2_Way_Size;i ++){
+        if (cache2[i].valid == 1 && cache2[i].tag == tag){// WRITE HIT
+            cache2[i].dirty = 1;
+            if (offset + len > Cache_L2_Block_Size){
+                memcpy(cache2[i].data + offset, &data, Cache_L2_Block_Size - offset);
+                write_cache2(addr + Cache_L2_Block_Size - offset,len - (Cache_L2_Block_Size - offset),data >> (8*(Cache_L2_Block_Size - offset)));
+            }else {
+                memcpy(cache2[i].data + offset, &data, len);
+            }
+            return;
         }
     }
-    if (!hit)
-    {
-        i = second_cache_read(addr);
-    }
-    cache2[i].dirty = true;
-    memcpy(cache2[i].data + offset, &data, len);
+    /*write allocate*/
+    i = read_cache2(addr);
+    cache2[i].dirty = 1;
+    memcpy(cache2[i].data + offset,&data,len);
 }

@@ -5,14 +5,11 @@
 
 extern char _vfprintf_internal;
 extern char _fpmaxtostr;
-
 extern char _ppfs_setargs;
-
 extern int __stdio_fwrite(char *buf, int len, FILE *stream);
 
-__attribute__((used)) static int format_FLOAT(FILE *stream, FLOAT f)
-{
-    /* TODO: Format a FLOAT argument `f' and write the formating
+__attribute__((used)) static int format_FLOAT(FILE *stream, FLOAT f) {
+	/* TODO: Format a FLOAT argument `f' and write the formating
 	 * result to `stream'. Keep the precision of the formating
 	 * result with 6 by truncating. For example:
 	 *              f          result
@@ -20,71 +17,68 @@ __attribute__((used)) static int format_FLOAT(FILE *stream, FLOAT f)
 	 *         0x00013333    "1.199996"
 	 */
 
-    char buf[80];
-    int len = 0;
-    if (f < 0)
-    {
-        buf[len++] = '-';
-        f = -f;
-    }
-    int ret = (f >> 16);
-    while (ret != 0)
-    {
-        buf[len++] = '0' + ret % 10;
-        ret /= 10;
-    }
-    char tmp;
-    int l = 0;
-    int r = len - 1;
-    if (buf[0] == '-')
-        l++;
-    while (l < r)
-    {
-        tmp = buf[l];
-        buf[l] = buf[r];
-        buf[r] = tmp;
-    }
-    buf[len++] = '.';
-    f &= 0xffff;
-    int i = 0;
-    for (i = 0; i < 6; i++)
-    {
-        f *= 10;
-        buf[len++] = '0' + (f >> 16);
-        f &= 0xffff;
-    }
-    return __stdio_fwrite(buf, len, stream);
+	char buf[80];
+	int op = (f >> 31) & 0x1;
+	if (op) f = (~f) + 1;
+
+
+	int frac = 0;
+	int i;
+	int base=100000000;//Accuracy
+	for (i = 15; i >= 0;i--){
+		base >>= 1;
+		if (f&(1<<i)){
+			frac += base;
+		}
+	}
+	int num = f >> 16;
+	int len = 0;
+	while (frac > 999999) frac /= 10;
+	if (op){
+		len = sprintf(buf,"-%d.%06d",num,frac);
+	}else {
+		len = sprintf(buf,"%d.%06d",num,frac);
+	}
+
+	//int len = sprintf(buf, "0x%08x", f);
+	return __stdio_fwrite(buf, len, stream);
 }
 
-static void modify_vfprintf()
-{
-    /* TODO: Implement this function to hijack the formating of "%f"
+static void modify_vfprintf() {
+	/* TODO: Implement this function to hijack the formating of "%f"
 	 * argument during the execution of `_vfprintf_internal'. Below
 	 * is the code section in _vfprintf_internal() relative to the
 	 * hijack.
 	 */
+	int addr = (int)(&_vfprintf_internal);
 
-    void *p = (void *)(int)&_vfprintf_internal + (0x80497f9 - 0x80494f3);
-    p++;
-    *(int *)p += ((int)format_FLOAT - (int)&_fpmaxtostr);
-    p--;
-    p -= (0xb4 - 0xaa);
-    *(char *)p = 0xff;
-    p++;
-    *(char *)p = 0x32;
-    p++;
-    *(char *)p = 0x90;
-    p -= 2;
-    p -= 3;
-    p += 2;
-    *(char *)p -= 0x4;
-    p -= 2;
-    p -= (0x8049de4 - 0x8049dcf);
-    *(char *)p = 0x90;
-    *(char *)(p + 1) = 0x90;
-    *(char *)(p + 4) = 0x90;
-    *(char *)(p + 5) = 0x90;
+	// mprotect((void*)((addr + 0x306 - 100) & 0xfffff000), 4096*2, PROT_READ|PROT_WRITE|PROT_EXEC);
 
+	//fstpt -> push
+	char *hijack = (char*)(addr + 0x306 - 0xa);
+	*hijack = 0xff;//push m32
+	hijack = (char*)(addr + 0x306 - 0x9);
+	*hijack = 0x32;//ModR/M: 00 110 010
+	hijack = (char*)(addr + 0x306 - 0x8);
+	*hijack = 0x90;//nop
+
+	hijack = (char*)(addr + 0x306 - 0xb);
+	*hijack = 0x08;//sub 0x8,%esp
+
+	hijack = (char*)(addr + 0x306 - 0x22);
+	*hijack = 0x90;//fldt -> nop
+
+	hijack = (char*)(addr + 0x306 - 0x21);
+	*hijack = 0x90;//fldt -> nop
+
+	hijack = (char*)(addr + 0x306 - 0x1e);
+	*hijack = 0x90;//fldl -> nop
+
+	hijack = (char*)(addr + 0x306 - 0x1d);
+	*hijack = 0x90;//fldl -> nop
+
+	int *pos = (int*)(addr + 0x307);
+	*pos += (int)format_FLOAT-(int)(&_fpmaxtostr);
 #if 0
 	else if (ppfs->conv_num <= CONV_A) {  /* floating point */
 		ssize_t nf;
@@ -103,7 +97,7 @@ static void modify_vfprintf()
 	} else if (ppfs->conv_num <= CONV_S) {  /* wide char or string */
 #endif
 
-    /* You should modify the run-time binary to let the code above
+	/* You should modify the run-time binary to let the code above
 	 * call `format_FLOAT' defined in this source file, instead of
 	 * `_fpmaxtostr'. When this function returns, the action of the
 	 * code above should do the following:
@@ -121,20 +115,23 @@ static void modify_vfprintf()
 		return 0;
 	} else if (ppfs->conv_num <= CONV_S) {  /* wide char or string */
 #endif
+
 }
 
-static void modify_ppfs_setargs()
-{
-    /* TODO: Implement this function to modify the action of preparing
+static void modify_ppfs_setargs() {
+	/* TODO: Implement this function to modify the action of preparing
 	 * "%f" arguments for _vfprintf_internal() in _ppfs_setargs().
 	 * Below is the code section in _vfprintf_internal() relative to
 	 * the modification.
 	 */
-    void *p = &_ppfs_setargs;
-    p += (0x804a0f1 - 0x804a080);
-    *(char *)p = 0xe9;
-    p++;
-    *(int *)p = (0x804a123 - 0x804a0f1 - 5);
+
+	int addr = (int)(&_ppfs_setargs);
+	char *hijack = (char*)(addr + 0x71);
+	*hijack = 0xeb;
+	hijack = (char*)(addr + 0x72);
+	*hijack = 0x30;
+	hijack = (char*)(addr + 0x73);
+	*hijack = 0x90;
 
 #if 0
 	enum {                          /* C type: */
@@ -152,13 +149,13 @@ static void modify_ppfs_setargs()
 
 	/* Flag bits that can be set in a type returned by `parse_printf_format'.  */
 	/* WARNING -- These differ in value from what glibc uses. */
-#define PA_FLAG_MASK (0xff00)
-#define __PA_FLAG_CHAR (0x0100) /* non-gnu -- to deal with hh */
-#define PA_FLAG_SHORT (0x0200)
-#define PA_FLAG_LONG (0x0400)
-#define PA_FLAG_LONG_LONG (0x0800)
-#define PA_FLAG_LONG_DOUBLE PA_FLAG_LONG_LONG
-#define PA_FLAG_PTR (0x1000) /* TODO -- make dynamic??? */
+#define PA_FLAG_MASK		(0xff00)
+#define __PA_FLAG_CHAR		(0x0100) /* non-gnu -- to deal with hh */
+#define PA_FLAG_SHORT		(0x0200)
+#define PA_FLAG_LONG		(0x0400)
+#define PA_FLAG_LONG_LONG	(0x0800)
+#define PA_FLAG_LONG_DOUBLE	PA_FLAG_LONG_LONG
+#define PA_FLAG_PTR		(0x1000) /* TODO -- make dynamic??? */
 
 	while (i < ppfs->num_data_args) {
 		switch(ppfs->argtype[i++]) {
@@ -201,7 +198,7 @@ static void modify_ppfs_setargs()
 	}
 #endif
 
-    /* You should modify the run-time binary to let the `PA_DOUBLE'
+	/* You should modify the run-time binary to let the `PA_DOUBLE'
 	 * branch execute the code in the `(PA_INT|PA_FLAG_LONG_LONG)'
 	 * branch. Comparing to the original `PA_DOUBLE' branch, the
 	 * target branch will also prepare a 64-bit argument, without
@@ -227,10 +224,10 @@ static void modify_ppfs_setargs()
 		++p;
 	}
 #endif
+
 }
 
-void init_FLOAT_vfprintf()
-{
-    modify_vfprintf();
-    modify_ppfs_setargs();
+void init_FLOAT_vfprintf() {
+	modify_vfprintf();
+	modify_ppfs_setargs();
 }

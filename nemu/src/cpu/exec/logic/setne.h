@@ -1,5 +1,5 @@
-#ifndef __SETNE_H_
-#define __SETNE_H_
+#ifndef __SETNE_H__
+#define __SETNE_H__
 
 make_helper(setne_rm_b);
 

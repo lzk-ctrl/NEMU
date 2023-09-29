@@ -1,6 +1,5 @@
 #include "cpu/exec/helper.h"
 
-
 #define DATA_BYTE 1
 #include "jle-template.h"
 #undef DATA_BYTE
@@ -13,5 +12,6 @@
 #include "jle-template.h"
 #undef DATA_BYTE
 
-make_helper_v(jle_i)
+/* for instruction encoding overloading */
 
+make_helper_v(jle_i)

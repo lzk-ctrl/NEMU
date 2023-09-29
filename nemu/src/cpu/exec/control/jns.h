@@ -2,6 +2,7 @@
 #define __JNS_H__
 
 make_helper(jns_i_b);
-make_helper(jns_iV);
+make_helper(jns_i_v);
+
 
 #endif

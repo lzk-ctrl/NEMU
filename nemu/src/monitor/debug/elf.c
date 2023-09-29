@@ -8,23 +8,6 @@ static char *strtab = NULL;
 static Elf32_Sym *symtab = NULL;
 static int nr_symtab_entry;
 
-uint32_t getVariable(char* name)
-{
-	int i;
-	for (i = 0; i < nr_symtab_entry; i++)
-	{
-    	if ((symtab[i].st_info & 0xf) == STT_OBJECT)
-		{
-    		char ls[50];
-    		strcpy(ls, strtab + symtab[i].st_name);
-    		if (strcmp(ls, name) == 0)
-        		return symtab[i].st_value;
-    	}
-	}
-	return 0;
-}
-
-
 void load_elf_tables(int argc, char *argv[]) {
 	int ret;
 	Assert(argc == 2, "run NEMU with format 'nemu [program]'");
@@ -96,4 +79,34 @@ void load_elf_tables(int argc, char *argv[]) {
 	assert(strtab != NULL && symtab != NULL);
 
 	fclose(fp);
+}
+
+uint32_t get_mark_value(char* str){
+	int i;
+	for(i = 0; i < nr_symtab_entry; i ++){
+		if((symtab[i].st_info & 0xf) == STT_OBJECT){
+			char syb[32];
+			int stlen = strlen(str);
+			strncpy(syb, strtab + symtab[i].st_name, stlen);
+			syb[stlen] = '\0';
+			if(strcmp(syb,str) == 0){
+				return symtab[i].st_value;
+			}
+		}
+	}
+	return 0;
+}
+
+void GetFunctionAddr(swaddr_t cur_addr,char* name){
+	int i;
+	for (i = 0; i < nr_symtab_entry; i++){
+		if ((symtab[i].st_info & 0xf) == STT_FUNC){
+			// printf("0x%08x\n",symtab[i].st_value);
+			if (cur_addr >= symtab[i].st_value && symtab[i].st_value + symtab[i].st_size >= cur_addr){
+				strcpy(name,strtab + symtab[i].st_name);
+				return;
+			}
+		}
+	}
+	name[0]='\0';
 }

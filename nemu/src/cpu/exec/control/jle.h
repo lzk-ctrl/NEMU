@@ -1,5 +1,5 @@
-#ifndef __JLE_H_
-#define __JLE_H_
+#ifndef __JLE_H__
+#define __JLE_H__
 
 make_helper(jle_i_b);
 make_helper(jle_i_v);
