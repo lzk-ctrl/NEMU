@@ -1,44 +1,40 @@
-#include "common.h"
-#include "memory/tlb.h"
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "burst.h"
+//
+// Created by Eric Zhao on 8/9/2021.
+//
 
-void init_tlb() {
+#include "memory/tlb.h"
+#include "stdlib.h"
+#include "time.h"
+
+void init_tlb(){
   int i;
-  for (i = 0; i < TLB_SIZE; i++) {
-    tlb[i].valid_value = false;
+  for (i = 0; i < TLB_SIZE; ++i) {
+	tlb[i].valid=false;
   }
-  return ;
 }
 
-int read_tlb(uint32_t addr) {
-  int dir = addr >> 12;
+uint32_t read_tlb(uint32_t tag){
   int i;
-  for (i = 0; i < TLB_SIZE; i++) {
-    if (tlb[i].tag == dir && tlb[i].valid_value) {
-      return i;
-    }
+  for(i=0;i<TLB_SIZE;i++){
+	if(tlb[i].valid && tlb[i].virtualPageNumber == tag){
+	  return tlb[i].physicalPageNumber;
+	}
   }
   return -1;
 }
 
-void write_tlb(uint32_t lnaddr, uint32_t hwaddr_t) {
-  int dir = lnaddr >> 12, page_num = hwaddr_t >> 12;
+void update_tlb(uint32_t tag,uint32_t physicalPageNumber){
   int i;
-  for (i = 0; i < TLB_SIZE; i++) {
-    if (!tlb[i].valid_value) {
-      tlb[i].valid_value = true;
-      tlb[i].tag = dir;
-      tlb[i].page_num = page_num;
-      return ;
-    }
+  for(i=0;i<TLB_SIZE;i++){
+	if (!tlb[i].valid){
+	  tlb[i].virtualPageNumber=tag;
+	  tlb[i].physicalPageNumber=physicalPageNumber;
+	  tlb[i].valid=true;
+	  return;
+	}
   }
-  srand(time(0));
-  i = rand() % TLB_SIZE;
-  tlb[i].valid_value = true;
-  tlb[i].tag = dir;
-  tlb[i].page_num = page_num;
-  return ;
+  srand(time(0)) ;
+  i=rand()%TLB_SIZE;
+  tlb[i].virtualPageNumber=tag;
+  tlb[i].physicalPageNumber=physicalPageNumber;
 }

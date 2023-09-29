@@ -1,19 +1,21 @@
-#ifndef __TLB_H__
-#define __TLB_H__
+//
+// Created by Eric Zhao on 8/9/2021.
+//
 
+#ifndef NEMU2021_NEMU_INCLUDE_MEMORY_TLB_H_
+#define NEMU2021_NEMU_INCLUDE_MEMORY_TLB_H_
+#define TLB_SIZE 64
 #include "common.h"
 
-#define TLB_SIZE 64
+typedef struct {
+  uint32_t virtualPageNumber:20;
+  uint32_t physicalPageNumber:20;
+  bool valid;
+}tlbentry;
 
-typedef struct{
-    bool valid_value;
-    uint32_t tag, page_num;
-} TLB;
-
-TLB tlb[TLB_SIZE];
+tlbentry tlb[TLB_SIZE];
 
 void init_tlb();
-int read_tlb(uint32_t addr);
-void write_tlb(uint32_t lnaddr, uint32_t hwaddr);
-
-#endif
+uint32_t read_tlb(uint32_t tag);
+void update_tlb(uint32_t,uint32_t);
+#endif //NEMU2021_NEMU_INCLUDE_MEMORY_TLB_H_
