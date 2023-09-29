@@ -12,5 +12,4 @@
 #include "js-template.h"
 #undef DATA_BYTE
 
-make_helper_v(js_i)
-
+make_helper_v(js_i);

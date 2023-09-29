@@ -42,3 +42,26 @@ void reg_test() {
 	assert(eip_sample == cpu.eip);
 }
 
+Sreg_Descriptor* sreg_desc;
+
+void sreg_load(uint8_t sreg_num) {
+	//Sreg_Descriptor* sreg_desc;
+	Assert(cpu.cr0.protect_enable, "not in protect mode.");
+	uint16_t index=cpu.SREG[sreg_num].selector>>3;
+	Assert((index<<3)<=cpu.GDTR.size,"segement selector is out of the limit.");
+	lnaddr_t chart_addr=cpu.GDTR.base+(index<<3);
+	sreg_desc->first_part=lnaddr_read(chart_addr,4);
+	sreg_desc->second_part=lnaddr_read(chart_addr+4,4);
+	uint32_t base_addr=0;
+	uint32_t seg_limit=0;
+	base_addr+=((uint32_t)sreg_desc->base1);
+	base_addr+=((uint32_t)sreg_desc->base2)<<16;
+	base_addr+=((uint32_t)sreg_desc->base3)<<24;
+	cpu.SREG[sreg_num].base=base_addr;
+	seg_limit+=((uint32_t)sreg_desc->limit1);
+	seg_limit+=((uint32_t)sreg_desc->limit2)<<16;
+	seg_limit+=((uint32_t)0xfff)<<24;
+	cpu.SREG[sreg_num].limit=seg_limit;
+	if(sreg_desc->g==1) cpu.SREG[sreg_num].limit<<=12;
+}
+
