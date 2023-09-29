@@ -1,22 +1,32 @@
-#ifndef __CACHE_H__
-#define __CACHE_H__
+#ifndef __CACHE__
+#define __CACHE__
 
-#include "common.h"
-
-#define E 8
-#define CACHE_BLOCK 64
-#define CACHE_SIZE 64*1024
-
-struct cache_l1 {
+typedef struct CacheLine
+{
+    uint32_t tag;
     bool valid;
-    int tag;
-    uint8_t byte[CACHE_BLOCK];
-} cache[CACHE_SIZE / CACHE_BLOCK];
+    bool dirty;
+    uint8_t *data;
+} CacheLine;
 
-uint64_t cnt;
+typedef struct Cache
+{
+    int blockSize;
+    int size;
+    int blockBit;
+    int groupBit;
+    int wayBit;
+    int groupSize;
+    int waySize;
+    CacheLine *lines;
 
-void init_cache();
-uint32_t cache_read(hwaddr_t addr);
-void cache_write(hwaddr_t addr,size_t len,uint32_t data);
+} Cache;
 
+void initCache();
+int read_cacheL1(hwaddr_t addr);
+int read_cacheL2(hwaddr_t addr);
+void write_cacheL2(hwaddr_t addr, size_t len, uint32_t data);
+void write_cacheL1(hwaddr_t addr,size_t len,uint32_t data);
+extern struct Cache cacheL2;
+extern struct Cache cacheL1;
 #endif

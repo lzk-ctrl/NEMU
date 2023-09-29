@@ -1,6 +1,7 @@
 #include "common.h"
 #include "burst.h"
 #include "misc.h"
+#include "memory/cache.h"
 
 /* Simulate the (main) behavor of DRAM.
  * Although this will lower the performace of NEMU, it makes
@@ -127,10 +128,10 @@ void dram_write(hwaddr_t addr, size_t len, uint32_t data) {
 	}
 }
 
-void call_ddr3_read(hwaddr_t addr, void *data){
-	ddr3_read(addr,data);
+void ddr3_write_replace(hwaddr_t addr, void *data, uint8_t *mask){
+	ddr3_write(addr,data,mask);
 }
 
-void call_ddr3_write(hwaddr_t addr, void *data, uint8_t *mask){
-	ddr3_write(addr,data,mask);
+void ddr3_read_replace(hwaddr_t addr, void *data){
+	ddr3_read(addr,data);
 }
