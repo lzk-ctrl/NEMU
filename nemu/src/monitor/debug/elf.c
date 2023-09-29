@@ -8,7 +8,8 @@ static char *strtab = NULL;
 static Elf32_Sym *symtab = NULL;
 static int nr_symtab_entry;
 
-void load_elf_tables(int argc, char *argv[]) {
+void load_elf_tables(int argc, char *argv[])
+{
 	int ret;
 	Assert(argc == 2, "run NEMU with format 'nemu [program]'");
 	exec_file = argv[1];
@@ -25,17 +26,16 @@ void load_elf_tables(int argc, char *argv[]) {
 	char magic[] = {ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3};
 
 	/* Check ELF header */
-	assert(memcmp(elf->e_ident, magic, 4) == 0);		// magic number
-	assert(elf->e_ident[EI_CLASS] == ELFCLASS32);		// 32-bit architecture
-	assert(elf->e_ident[EI_DATA] == ELFDATA2LSB);		// littel-endian
-	assert(elf->e_ident[EI_VERSION] == EV_CURRENT);		// current version
-	assert(elf->e_ident[EI_OSABI] == ELFOSABI_SYSV || 	// UNIX System V ABI
-			elf->e_ident[EI_OSABI] == ELFOSABI_LINUX); 	// UNIX - GNU
-	assert(elf->e_ident[EI_ABIVERSION] == 0);			// should be 0
-	assert(elf->e_type == ET_EXEC);						// executable file
-	assert(elf->e_machine == EM_386);					// Intel 80386 architecture
-	assert(elf->e_version == EV_CURRENT);				// current version
-
+	assert(memcmp(elf->e_ident, magic, 4) == 0);	  // magic number
+	assert(elf->e_ident[EI_CLASS] == ELFCLASS32);	  // 32-bit architecture
+	assert(elf->e_ident[EI_DATA] == ELFDATA2LSB);	  // littel-endian
+	assert(elf->e_ident[EI_VERSION] == EV_CURRENT);	  // current version
+	assert(elf->e_ident[EI_OSABI] == ELFOSABI_SYSV || // UNIX System V ABI
+		   elf->e_ident[EI_OSABI] == ELFOSABI_LINUX); // UNIX - GNU
+	assert(elf->e_ident[EI_ABIVERSION] == 0);		  // should be 0
+	assert(elf->e_type == ET_EXEC);					  // executable file
+	assert(elf->e_machine == EM_386);				  // Intel 80386 architecture
+	assert(elf->e_version == EV_CURRENT);			  // current version
 
 	/* Load symbol table and string table for future use */
 
@@ -53,9 +53,11 @@ void load_elf_tables(int argc, char *argv[]) {
 	assert(ret == 1);
 
 	int i;
-	for(i = 0; i < elf->e_shnum; i ++) {
-		if(sh[i].sh_type == SHT_SYMTAB && 
-				strcmp(shstrtab + sh[i].sh_name, ".symtab") == 0) {
+	for (i = 0; i < elf->e_shnum; i++)
+	{
+		if (sh[i].sh_type == SHT_SYMTAB &&
+			strcmp(shstrtab + sh[i].sh_name, ".symtab") == 0)
+		{
 			/* Load symbol table from exec_file */
 			symtab = malloc(sh[i].sh_size);
 			fseek(fp, sh[i].sh_offset, SEEK_SET);
@@ -63,8 +65,9 @@ void load_elf_tables(int argc, char *argv[]) {
 			assert(ret == 1);
 			nr_symtab_entry = sh[i].sh_size / sizeof(symtab[0]);
 		}
-		else if(sh[i].sh_type == SHT_STRTAB && 
-				strcmp(shstrtab + sh[i].sh_name, ".strtab") == 0) {
+		else if (sh[i].sh_type == SHT_STRTAB &&
+				 strcmp(shstrtab + sh[i].sh_name, ".strtab") == 0)
+		{
 			/* Load string table from exec_file */
 			strtab = malloc(sh[i].sh_size);
 			fseek(fp, sh[i].sh_offset, SEEK_SET);
@@ -80,36 +83,16 @@ void load_elf_tables(int argc, char *argv[]) {
 
 	fclose(fp);
 }
-
-uint32_t GetMarkValue(char* str,bool* success){
-
-	int i;
-	for (i = 0; i < nr_symtab_entry; i++){
-		if ((symtab[i].st_info & 0xf) == STT_OBJECT){
-			char syb[32];
-			int stlen = strlen(str);
-			strncpy(syb,strtab + symtab[i].st_name,stlen);
-			syb [stlen] = '\0';
-			if (strcmp(syb,str) == 0){
-				*success = true;
-				return symtab[i].st_value;
-			} 
-		}
-	}
-	*success = false;
-	return 0;
-}
-
-void get_func_name(swaddr_t *current_addr,char *name)
+int var_read(char *name)
 {
 	int i;
-	for(i=0;i<nr_symtab_entry;i++){
-		if(((symtab[i].st_info&0xf)==STT_FUNC) &&( symtab[i].st_value<*current_addr)&&(symtab[i].st_value+symtab[i].st_size>=*current_addr)){
-			int len=strlen(strtab+symtab[i].st_name);
-			strncpy(name,strtab+symtab[i].st_name,len);
-			name[len]='\0';
-			return;
+	for (i = 0; i < nr_symtab_entry; i++)
+	{
+		if (((symtab[i].st_info & 0xf) == STT_OBJECT) || ((symtab[i].st_info & 0xf) == STT_FUNC))
+		{
+			if (strcmp(strtab + symtab[i].st_name, name) == 0)
+				return symtab[i].st_value;
 		}
 	}
-	name[0]='\0';
+	return 0;
 }

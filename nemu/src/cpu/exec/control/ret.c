@@ -12,5 +12,4 @@
 #include "ret-template.h"
 #undef DATA_BYTE
 
-make_helper_v(ret_p)
-make_helper_v(ret_si)
+make_helper_v(ret_n)

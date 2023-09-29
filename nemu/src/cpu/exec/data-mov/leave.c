@@ -8,5 +8,4 @@
 #include "leave-template.h"
 #undef DATA_BYTE
 
-
-make_helper_v(leave_n)
+make_helper_v(leave);

@@ -1,4 +1,5 @@
 #include "monitor/monitor.h"
+#include "monitor/watchpoint.h"
 #include "cpu/helper.h"
 #include <setjmp.h>
 
@@ -7,9 +8,7 @@
  * This is useful when you use the `si' command.
  * You can modify this value as you want.
  */
-#define MAX_INSTR_TO_PRINT 10
-
-bool check_watchpoint();//检查监视点
+#define MAX_INSTR_TO_PRINT -1	//10 -> MAX
 
 int nemu_state = STOP;
 
@@ -75,15 +74,15 @@ void cpu_exec(volatile uint32_t n) {
 #endif
 
 		/* TODO: check watchpoints here. */
-		if(check_watchpoint()==false)
-		{
-			nemu_state=STOP;
-		}
+	if (check_wp() == true){
+		nemu_state = STOP;
+	}
 
 #ifdef HAS_DEVICE
 		extern void device_update();
 		device_update();
 #endif
+
 		if(nemu_state != RUNNING) { return; }
 	}
 

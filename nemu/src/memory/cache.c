@@ -1,139 +1,96 @@
-#include "common.h"
+#include "memory/cache.h"
 #include "burst.h"
 #include <stdlib.h>
-#include "cache.h"
+#include <time.h>
+#include "cpu/reg.h"
 
-void ddr3_read(hwaddr_t addr, void *data);
-void ddr3_write(hwaddr_t addr, void *data, uint8_t *mask);
+void dram_write(hwaddr_t addr, size_t len, uint32_t data);
+void cache_ddr3_read(hwaddr_t addr, void *data);
+void cache_ddr3_write(hwaddr_t addr, void *data, uint8_t *mask);
 
 void init_cache()
 {
-	int i;
-	for (i = 0; i < STORAGE_SIZE_L1 / BLOCK_SIZE; i++)
-	{
-		cache[i].valid = false;
-		cache[i].tag = 0;
-		memset(cache[i].data, 0, BLOCK_SIZE);
-	}
-	for (i = 0; i < STORAGE_SIZE_L2 / BLOCK_SIZE; i++)
-	{
-		cache2[i].valid = false;
-		cache2[i].dirty = false;
-		cache2[i].tag = 0;
-		memset(cache2[i].data, 0, BLOCK_SIZE);
-	}
+    timer = 0;
+    srand(clock());
+    int i, j;
+    for (i = 0; i < 128; i++)
+    {
+        for (j = 0; j < 8; j++)
+        {
+            cache[i].set[j].valid = 0;
+        }
+    }
+}
+int32_t readcache(hwaddr_t addr)
+{
+    int32_t t = (addr >> (7 + 6));
+    int32_t s = (addr >> 6) & (128 - 1);
+    int i;
+    for (i = 0; i < 8; i++)
+    {
+        if (!cache[s].set[i].valid)
+            continue;
+        if (cache[s].set[i].valid && cache[s].set[i].tag == t)
+        {
+            timer += 2;
+            return i;
+        }
+    }
+    /* miss */
+    for (i = 0; i < 8; i++)
+    {
+        if (!cache[s].set[i].valid)
+            break;
+    }
+    if (i == 8)
+        i = rand() % 8;
+    cache[s].set[i].valid = 1;
+    cache[s].set[i].tag = t;
+    int j;
+    for (j = 0; j < 64 / BURST_LEN; j++)
+    {
+        cache_ddr3_read(((addr >> 6) << 6) + BURST_LEN * j, cache[s].set[i].block + BURST_LEN * j);
+    }
+    timer += 200;
+    return i;
+}
 
-}
-uint32_t secondarycache_read(hwaddr_t addr)
+void writecache(hwaddr_t addr, size_t len, uint32_t data)
 {
-	uint32_t g = (addr >> 6) & ((1 << 12) - 1); 
-	uint32_t block = (addr >> 6) << 6;
-	int i;
-	bool v = false;
-	for (i = g * SIXTEEN_WAY; i < (g + 1) * SIXTEEN_WAY; i++)
-	{
-		if (cache2[i].tag == (addr >> 18) && cache2[i].valid)
-		{
-			v = true;
-			break;
-		}
-	}
-	if (!v)
-	{
-		int j;
-		for (i = g * SIXTEEN_WAY; i < (g + 1) * SIXTEEN_WAY; i++)
-		{
-			if (!cache2[i].valid)
-				break;
-		}
-		if (i == (g + 1) * SIXTEEN_WAY) 
-		{
-			srand(0);
-			i = g * SIXTEEN_WAY + rand() % SIXTEEN_WAY;
-			if (cache2[i].dirty)
-			{
-				uint8_t mask[BURST_LEN * 2];
-				memset(mask, 1, BURST_LEN * 2);
-				for (j = 0; j < BLOCK_SIZE / BURST_LEN; j++)
-					ddr3_write(block + j * BURST_LEN, cache2[i].data + j * BURST_LEN, mask);
-			}
-		}
-		cache2[i].valid = true;
-		cache2[i].tag = addr >> 18;
-		cache2[i].dirty = false;
-		for (j = 0; j < BURST_LEN; j++)
-			ddr3_read(block + j * BURST_LEN, cache2[i].data + j * BURST_LEN);
-	}
-	return i;
-}
-uint32_t cache_read(hwaddr_t addr)
-{
-	uint32_t g = (addr >> 6) & 0x7f; 
-	int i;
-	bool v = false;
-	for (i = g * EIGHT_WAY; i < (g + 1) * EIGHT_WAY; i++)
-	{
-		if (cache[i].tag == (addr >> 13) && cache[i].valid)
-		{
-			v = true;
-			break;
-		}
-	}
-	if (!v)
-	{
-		int j = secondarycache_read(addr);
-		for (i = g * EIGHT_WAY; i < (g + 1) * EIGHT_WAY; i++)
-		{
-			if (!cache[i].valid)
-				break;
-		}
-		if (i == (g + 1) * EIGHT_WAY) 
-		{
-			srand(0);
-			i = g * EIGHT_WAY + rand() % EIGHT_WAY;
-		}
-		cache[i].valid = true;
-		cache[i].tag = addr >> 13;
-		memcpy(cache[i].data, cache2[j].data, BLOCK_SIZE);
-	}
-	return i;
-}
-void secondarycache_write(hwaddr_t addr, size_t len, uint32_t data)
-{
-	uint32_t g = (addr >> 6) & ((1 << 12) - 1); 
-	uint32_t offset = addr & (BLOCK_SIZE - 1);	
-	int i;
-	bool v = false;
-	for (i = g * SIXTEEN_WAY; i < (g + 1) * SIXTEEN_WAY; i++)
-	{
-		if (cache2[i].tag == (addr >> 13) && cache2[i].valid)
-		{
-			v = true;
-			break;
-		}
-	}
-	if (!v)
-		i = secondarycache_read(addr);
-	cache2[i].dirty = true;
-	memcpy(cache2[i].data + offset, &data, len);
-}
-void cache_write(hwaddr_t addr, size_t len, uint32_t data)
-{
-	uint32_t g = (addr >> 6) & 0x7f;		   
-	uint32_t offset = addr & (BLOCK_SIZE - 1); 
-	int i;
-	bool v = false;
-	for (i = g * EIGHT_WAY; i < (g + 1) * EIGHT_WAY; i++)
-	{
-		if (cache[i].tag == (addr >> 13) && cache[i].valid)
-		{
-			v = true;
-			break;
-		}
-	}
-	if (v)
-	{
-		memcpy(cache[i].data + offset, &data, len);
-	}
-	secondarycache_write(addr, len, data);
+    /* write through	&	not write allocate */
+    int32_t t = (addr >> (7 + 6));
+    int32_t s = (addr >> 6) & (128 - 1);
+    int32_t imm = (addr & (64 - 1));
+    bool hit = false;
+    int i;
+    for (i = 0; i < 8; i++)
+    {
+        if (!cache[s].set[i].valid)
+            continue;
+        if (cache[s].set[i].tag == t)
+        {
+            hit = true;
+            break;
+        }
+    }
+    if (hit)
+    {
+        if (imm + len <= 64)
+        {
+            memcpy(cache[s].set[i].block + imm, &data, len);
+            dram_write(addr, len, data);
+        }
+        else
+        {
+            memcpy(cache[s].set[i].block + imm, &data, 64 - imm); // 低位低地址
+            dram_write(addr, 64 - imm, data);
+            writecache(addr + 64 - imm, len - (64 - imm), data >> 8 * (64 - imm)); // 高位高地址
+        }
+        timer += 2;
+    }
+    else
+    {
+        dram_write(addr, len, data);
+        timer += 200;
+    }
 }

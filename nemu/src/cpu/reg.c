@@ -8,14 +8,16 @@ const char *regsl[] = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"};
 const char *regsw[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
 const char *regsb[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
 
-void reg_test() {
+void reg_test()
+{
 	srand(time(0));
 	uint32_t sample[8];
 	uint32_t eip_sample = rand();
 	cpu.eip = eip_sample;
 
 	int i;
-	for(i = R_EAX; i <= R_EDI; i ++) {
+	for (i = R_EAX; i <= R_EDI; i++)
+	{
 		sample[i] = rand();
 		reg_l(i) = sample[i];
 		assert(reg_w(i) == (sample[i] & 0xffff));
@@ -41,4 +43,15 @@ void reg_test() {
 
 	assert(eip_sample == cpu.eip);
 }
-
+void sreg_set(uint8_t id)
+{
+	lnaddr_t chart_addr = cpu.GDTR.base + ((cpu.sreg[id].selector >> 3) << 3);
+	sreg_info.p1 = lnaddr_read(chart_addr, 4);
+	sreg_info.p2 = lnaddr_read(chart_addr + 4, 4);
+	cpu.sreg[id].base = sreg_info.b1 + (sreg_info.b2 << 16) + (sreg_info.b3 << 24);
+cpu.sreg[id].limit = sreg_info.lim1 + (sreg_info.lim2 << 16) + ((uint32_t)0xfff << 24);
+	if (sreg_info.g == 1)
+	{
+		cpu.sreg[id].limit <<= 12;
+	}
+}

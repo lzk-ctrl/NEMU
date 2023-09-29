@@ -2,7 +2,7 @@
 
 #define ENTRY_START 0x100000
 
-extern uint8_t entry [];
+extern uint8_t entry[];
 extern uint32_t entry_len;
 extern char *exec_file;
 
@@ -11,20 +11,24 @@ void init_regex();
 void init_wp_pool();
 void init_ddr3();
 void init_cache();
+void init_tlb();
 
 FILE *log_fp = NULL;
 
-static void init_log() {
+static void init_log()
+{
 	log_fp = fopen("log.txt", "w");
 	Assert(log_fp, "Can not open 'log.txt'");
 }
 
-static void welcome() {
+static void welcome()
+{
 	printf("Welcome to NEMU!\nThe executable is %s.\nFor help, type \"help\"\n",
-			exec_file);
+		   exec_file);
 }
 
-void init_monitor(int argc, char *argv[]) {
+void init_monitor(int argc, char *argv[])
+{
 	/* Perform some global initialization */
 
 	/* Open the log file. */
@@ -43,8 +47,20 @@ void init_monitor(int argc, char *argv[]) {
 	welcome();
 }
 
+static void init_cr0()
+{
+	cpu.cr0.protect_enable = 0;
+	cpu.cr0.paging = 0;
+}
+
+static void init_cs()
+{
+	cpu.CS.base = 0, cpu.CS.limit = 0xffffffff;
+}
+
 #ifdef USE_RAMDISK
-static void init_ramdisk() {
+static void init_ramdisk()
+{
 	int ret;
 	const int ramdisk_max_size = 0xa0000;
 	FILE *fp = fopen(exec_file, "rb");
@@ -61,7 +77,8 @@ static void init_ramdisk() {
 }
 #endif
 
-static void load_entry() {
+static void load_entry()
+{
 	int ret;
 	FILE *fp = fopen("entry", "rb");
 	Assert(fp, "Can not open 'entry'");
@@ -75,8 +92,14 @@ static void load_entry() {
 	fclose(fp);
 }
 
-void restart() {
+void restart()
+{
 	/* Perform some initialization to restart a program */
+	init_cache();
+	init_tlb();
+	init_cr0();
+	init_cs();
+	cpu.eflags.val = 2;
 #ifdef USE_RAMDISK
 	/* Read the file with name `argv[1]' into ramdisk. */
 	init_ramdisk();
@@ -87,10 +110,7 @@ void restart() {
 
 	/* Set the initial instruction pointer. */
 	cpu.eip = ENTRY_START;
-	cpu.eflags.val = 0x00000002;
 
-	/* Initialize CACHE. */
-	init_cache();
 	/* Initialize DRAM. */
 	init_ddr3();
 }
