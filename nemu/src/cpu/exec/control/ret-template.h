@@ -2,20 +2,36 @@
 
 #define instr ret
 
-make_helper(concat(ret_n_, SUFFIX)) {
-  cpu.eip = MEM_R(reg_l(R_ESP)) - 1;
-  reg_l(R_ESP) += DATA_BYTE;
-  print_asm("ret");
-  return 1;
+void static do_execute(){
+
+    cpu.eip=swaddr_read(cpu.esp, 4,R_SS)-1-op_src->size;
+    cpu.esp+=4;
+    cpu.esp+=op_src->val;
+    if(!op_src->size)
+        print_asm(str(instr));
+    else
+        print_asm(str(instr)" $0x%x",op_src->val);
 }
 
-make_helper(concat(ret_i_, SUFFIX)) {
-  uint32_t num = instr_fetch(eip + 1, 2);
-  cpu.eip = MEM_R(reg_l(R_ESP)) - 3;
-  reg_l(R_ESP) += DATA_BYTE;
-  reg_l(R_ESP) += num;
-  print_asm("ret 0x%x", num);
-  return 3;
+make_helper(instr){
+
+    op_src->val=0;
+    op_src->size=0;
+    do_execute();
+    return 1;
 }
+
+make_helper(concat(instr,_i_w)){
+
+    int len = 1;
+    len+= decode_i_w(eip+1);
+    op_src->size=2;
+    do_execute();
+    return len;
+}
+
+
+
+
 
 #include "cpu/exec/template-end.h"

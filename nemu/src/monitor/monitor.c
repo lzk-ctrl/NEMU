@@ -1,9 +1,10 @@
 #include "nemu.h"
 #include "memory/cache.h"
-#include "memory/tlb.h"
 
 #define ENTRY_START 0x100000
+void make_all_tlb();
 
+extern CACHE L1_cache;
 extern uint8_t entry [];
 extern uint32_t entry_len;
 extern char *exec_file;
@@ -39,7 +40,7 @@ void init_monitor(int argc, char *argv[]) {
 
 	/* Initialize the watchpoint pool. */
 	init_wp_pool();
-
+	make_all_tlb();
 
 	/* Display welcome message. */
 	welcome();
@@ -88,23 +89,11 @@ void restart() {
 	load_entry();
 
 	/* Set the initial instruction pointer. */
+	cpu.eflags.val=2;
 	cpu.eip = ENTRY_START;
-  cpu.eflags.val = 0x00000002;
-
-  /* Initialize the cahce */
-  init_cache();
-
-  /* Initialize the TLB*/
-  init_tlb();
-
-  /* Initialize the Segment Register*/
-  cpu.cr0.protect_enable = 0;
-  cpu.cr0.paging = 0;
-
-  /* Initialize CS Register */
-  cpu.cs.base = 0;
-  cpu.cs.limit = 0xffffffff;
+	cpu.cr0.val=0x0;
 
 	/* Initialize DRAM. */
 	init_ddr3();
+	L1_cache.state=0;
 }
