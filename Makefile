@@ -3,6 +3,7 @@
 .PHONY: nemu entry testcase kernel run gdb test submit clean
 
 CC := gcc
+CC4 := /usr/bin/gcc-4.4
 LD := ld
 CFLAGS := -MMD -Wall -Werror -c
 
@@ -54,10 +55,11 @@ clean: clean-cpp
 ##### some convinient rules #####
 
 USERPROG := obj/testcase/add
-ENTRY := $(kernel_BIN)
+ENTRY := $(USERPROG)
 
 entry: $(ENTRY)
 	objcopy -S -O binary $(ENTRY) entry
+
 run: $(nemu_BIN) $(USERPROG) entry
 	$(call git_commit, "run")
 	$(nemu_BIN) $(USERPROG)
@@ -72,6 +74,3 @@ test: $(nemu_BIN) $(testcase_BIN) entry
 
 submit: clean
 	cd .. && zip -r $(STU_ID).zip $(shell pwd | grep -o '[^/]*$$')
-
-count:
-	@find nemu -name "*\.[c|h]" | xargs cat | grep -v ^$$ | wc -l

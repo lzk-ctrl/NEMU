@@ -1,139 +1,70 @@
-#include "nemu.h"
+#include "common.h"
 #include "memory/cache.h"
-#include <time.h>
 #include "burst.h"
-#include <stdlib.h>
+#include "stdlib.h"
 
-void init_cache() {
-  int i;
-  for (i = 0; i < CACHE_L1_SET_NUM * CACHE_L1_WAY_NUM; i++) {
-    cache_L1[i].validVal = false;
-  }
-  for (i = 0; i < CACHE_L2_SET_NUM * CACHE_L2_WAY_NUM; i++) {
-    cache_L2[i].dirtyVal = false;
-    cache_L2[i].validVal = false;
-  }
-  return;
-}
+uint32_t dram_read(hwaddr_t addr, size_t len);
+void call_ddr3_read(hwaddr_t, void *);
+void call_ddr3_write(hwaddr_t, void *, uint8_t *);
 
-void ddr3_read_me(hwaddr_t addr, void* data);
-
-// return whole index of way in cacheL1
-int read_cache_L1(hwaddr_t addr) {
-  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L1_SET_NUM - 1));
-  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L1_SET_BIT));
-  // uint32_t block_start = ((addr >> CACHE_BLOCK_BIT) << CACHE_BLOCK_BIT);
-
-  int wayIndex;
-  int whole_begin_wayIndex = setIndex * CACHE_L1_WAY_NUM;
-  int whole_end_wayIndex = (setIndex + 1) * CACHE_L1_WAY_NUM;
-  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++)
-    if (cache_L1[wayIndex].validVal && cache_L1[wayIndex].tag == tag) // Hit!
-      return wayIndex;
-  // Hit loss!
-  // go to cacheL2
-  srand(time(0));
-  int wayIndex_L2 = read_cache_L2(addr);
-  wayIndex = whole_begin_wayIndex + rand() % CACHE_L1_WAY_NUM;
-  memcpy(cache_L1[wayIndex].data, cache_L2[wayIndex_L2].data, CACHE_BLOCK_SIZE);
-
-  cache_L1[wayIndex].validVal = true;
-  cache_L1[wayIndex].tag = tag;
-  return wayIndex;
-}
-
-void ddr3_write_me(hwaddr_t addr, void* data, uint8_t* mask);
-
-// return whole index of way in cacheL2
-int read_cache_L2(hwaddr_t addr) {
-  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L2_SET_NUM - 1));
-  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L2_SET_BIT));
-  uint32_t block_start = ((addr >> CACHE_BLOCK_BIT) << CACHE_BLOCK_BIT);
-
-  int wayIndex;
-  int whole_begin_wayIndex = setIndex * CACHE_L2_WAY_NUM;
-  int whole_end_wayIndex = (setIndex + 1) * CACHE_L2_WAY_NUM;
-  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++)
-    if (cache_L2[wayIndex].validVal && cache_L2[wayIndex].tag == tag) return wayIndex; // Hit!
-  // Hit loss!
-  srand(time(0));
-  wayIndex = whole_begin_wayIndex + rand() % CACHE_L2_WAY_NUM;
-  int i;
-  if (cache_L2[wayIndex].validVal && cache_L2[wayIndex].dirtyVal) {
-    // write down
-    uint8_t tmp[BURST_LEN << 1];
-    memset(tmp, 1, sizeof(tmp));
-    uint32_t block_start_x = (cache_L2[wayIndex].tag << (CACHE_L2_SET_BIT + CACHE_BLOCK_BIT)) | (setIndex << CACHE_BLOCK_BIT);
-    for (i = 0; i < CACHE_BLOCK_SIZE / BURST_LEN; i++) {
-      ddr3_write_me(block_start_x + BURST_LEN * i, cache_L2[wayIndex].data + BURST_LEN * i, tmp);
+void init_cache(){
+    int i;
+    for (i = 0; i < CACHE_SIZE / CACHE_BLOCK; i++){
+        cache[i].valid = false;
+        cache[i].tag = 0;
+        memset(cache[i].byte, 0, CACHE_BLOCK);
     }
-  }
-  for (i = 0; i < CACHE_BLOCK_SIZE / BURST_LEN; i++) {
-    ddr3_read_me(block_start + BURST_LEN * i, cache_L2[wayIndex].data + BURST_LEN * i);
-  }
-  cache_L2[wayIndex].validVal = true;
-  cache_L2[wayIndex].dirtyVal = false;
-  cache_L2[wayIndex].tag = tag;
-  return wayIndex;
+    cnt = 0;
 }
 
-void dram_write(hwaddr_t addr, size_t len, uint32_t data);
-
-void write_cache_L1(hwaddr_t addr, size_t len, uint32_t data) {
-  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L1_SET_NUM - 1));
-  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L1_SET_BIT));
-  uint32_t block_bias = addr & (CACHE_BLOCK_SIZE - 1);
-  int wayIndex;
-  int whole_begin_wayIndex = setIndex * CACHE_L1_WAY_NUM;
-  int whole_end_wayIndex = (setIndex + 1) * CACHE_L1_WAY_NUM;
-  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++) {
-    if (cache_L1[wayIndex].validVal && cache_L1[wayIndex].tag == tag) {
-      // Hit!
-      // write through
-      if (block_bias + len > CACHE_BLOCK_SIZE) {
-        dram_write(addr, CACHE_BLOCK_SIZE - block_bias, data);
-        memcpy(cache_L1[wayIndex].data + block_bias, &data, CACHE_BLOCK_SIZE - block_bias);
-        write_cache_L2(addr, CACHE_BLOCK_SIZE - block_bias, data);
-        write_cache_L1(addr + CACHE_BLOCK_SIZE - block_bias, len - (CACHE_BLOCK_SIZE - block_bias), data >> (CACHE_BLOCK_SIZE - block_bias));
-      } else {
-        dram_write(addr, len, data);
-        memcpy(cache_L1[wayIndex].data + block_bias, &data, len);
-        write_cache_L2(addr, len, data);
-      }
-      return;
+uint32_t cache_read(hwaddr_t addr) {
+    uint32_t set = (addr >> 6) & 0x7f; //取出地址中set的部分（右移block位并 & 1111111），set = 7 byte (set = 2^s = 128), offset = 6 byte (block = 2^e = 64)
+    bool hit = false;
+    int i;
+    for (i = set * E; i < (set + 1) * E; i++) { //找到相应set所在
+        if (cache[i].tag == (addr >> 13) && cache[i].valid) { //如果tag和地址相符合并且alid == true
+            hit = true; 
+            cnt += 2;
+            break;
+        }
     }
-  }
-  //  Hit loss!
-  // not write allocate
-  write_cache_L2(addr, len, data);
-  return;
+    if (!hit) { //找不到
+        for (i = set * E; i < (set + 1) * E; i++) { //去到相应set所在
+            if (!cache[i].valid) //找到空的地方退出
+            break; 
+        }
+        if (i == (set + 1) * E) { // 到最后仍然没有找到空的地方，执行随机替换算法
+            srand(0);
+            i = set * E + rand() % E;
+        }
+        cache[i].valid = true;
+        cache[i].tag = addr >> 13;
+       int j;
+       uint32_t block = (addr >> 6) << 6; // 取出block
+         for (j = 0; j < BURST_LEN; j++) {
+            call_ddr3_read(block + j * BURST_LEN, cache[i].byte + j * BURST_LEN); 
+         }
+        cnt += 200;
+    }
+    return i;
 }
 
-void write_cache_L2(hwaddr_t addr, size_t len, uint32_t data) {
-  uint32_t setIndex = ((addr >> CACHE_BLOCK_BIT) & (CACHE_L2_SET_NUM - 1));
-  uint32_t tag = (addr >> (CACHE_BLOCK_BIT + CACHE_L2_SET_BIT));
-  uint32_t block_bias = addr & (CACHE_BLOCK_SIZE - 1);
-  int wayIndex;
-  int whole_begin_wayIndex = setIndex * CACHE_L2_WAY_NUM;
-  int whole_end_wayIndex = (setIndex + 1) * CACHE_L2_WAY_NUM;
-  for (wayIndex = whole_begin_wayIndex; wayIndex < whole_end_wayIndex; wayIndex++) {
-    if (cache_L2[wayIndex].validVal && cache_L2[wayIndex].tag == tag) {
-      // Hit!
-      // write back
-      cache_L2[wayIndex].dirtyVal = true;
-      if (block_bias + len > CACHE_BLOCK_SIZE) {
-        memcpy(cache_L2[wayIndex].data + block_bias, &data, CACHE_BLOCK_SIZE - block_bias);
-        write_cache_L2(addr + CACHE_BLOCK_SIZE - block_bias, len - (CACHE_BLOCK_SIZE - block_bias), data >> (CACHE_BLOCK_SIZE - block_bias));
-      } else {
-        memcpy(cache_L2[wayIndex].data + block_bias, &data, len);
-      }
-      return;
+void cache_write(hwaddr_t addr, size_t len, uint32_t data) {
+    uint32_t set = (addr >> 6) & 0x7f;
+    uint32_t offset = addr & (CACHE_BLOCK - 1); 
+    int i;
+    bool hit = false;
+    for (i = set * E; i < (set + 1) * E; i++) {
+        if (cache[i].tag == (addr >> 13) && cache[i].valid) {
+            hit = true;
+            break;
+        }
     }
-  }
-  //  Hit loss!
-  // write allocate
-  wayIndex = read_cache_L2(addr);
-  cache_L2[wayIndex].dirtyVal = true;
-  memcpy(cache_L2[wayIndex].data + block_bias, &data, len);
-  return;
+    if (hit) { // 写直通
+        memcpy(cache[i].byte + offset, &data, len);
+    }     
+    else {
+        i = cache_read(addr);
+         memcpy(cache[i].byte + offset, &data, len);
+    }
 }

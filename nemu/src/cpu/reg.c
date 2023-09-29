@@ -68,7 +68,8 @@ void sreg_load(uint8_t sreg_num) {
   limits += ((uint32_t)sreg_desc -> limit2) << 16;
   limits += ((uint32_t)0xfff) << 24;
   cpu.sreg[sreg_num].limit = limits;
-  if (sreg_desc -> g == 1) cpu.sreg[sreg_num].limit <<= 12;//G = 0, unit = 1B;G = 1, unit = 4KB
-
+  if (sreg_desc -> g == 1) {
+      cpu.sreg[sreg_num].limit <<= 12;//G = 0, unit = 1B;G = 1, unit = 4KB
+  }
   return ;
 }
