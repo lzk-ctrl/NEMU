@@ -3,20 +3,6 @@
 
 #include "cpu/helper.h"
 
-//yi xia wei wo
-
-make_helper(decode_rel_b);
-make_helper(decode_rel_w);
-make_helper(decode_rel_l);
-make_helper(decode_rel_v);
-
-
-
-make_helper(decode_n_b);
-make_helper(decode_n_w);
-make_helper(decode_n_l);
-
-//yi shang wei wo
 make_helper(decode_r_b);
 make_helper(decode_r_w);
 make_helper(decode_r_l);

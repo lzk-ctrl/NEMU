@@ -2,12 +2,12 @@
 
 #include "data-mov/mov.h"
 #include "data-mov/xchg.h"
-#include "data-mov/push.h"
-#include "data-mov/pop.h"
 #include "data-mov/movext.h"
 #include "data-mov/cltd.h"
+#include "data-mov/push.h"
+#include "data-mov/pop.h"
 #include "data-mov/leave.h"
-#include "data-mov/mov_sreg.h"
+#include "data-mov/lgdt.h"
 
 #include "arith/adc.h"
 #include "arith/dec.h"
@@ -22,14 +22,19 @@
 #include "arith/cmp.h"
 #include "arith/add.h"
 
-
 #include "control/jmp.h"
-#include "control/ret.h"
 #include "control/call.h"
-#include "control/jcc.h"
-#include "control/test.h"
-#include "control/flags.h"
-
+#include "control/je.h"
+#include "control/ret.h"
+#include "control/ja.h"
+#include "control/jbe.h"
+#include "control/jne.h"
+#include "control/jg.h"
+#include "control/jge.h"
+#include "control/jl.h"
+#include "control/jle.h"
+#include "control/jns.h"
+#include "control/js.h"
 
 #include "logic/and.h"
 #include "logic/or.h"
@@ -39,18 +44,18 @@
 #include "logic/shl.h"
 #include "logic/shr.h"
 #include "logic/shrd.h"
-#include "logic/setcc.h"
+#include "logic/test.h"
+#include "logic/setne.h"
+#include "logic/sete.h"
 
 #include "string/rep.h"
 #include "string/scas.h"
 #include "string/stos.h"
 #include "string/movs.h"
 #include "string/lods.h"
+#include "string/std.h"
+#include "string/cld.h"
 
 #include "misc/misc.h"
 
 #include "special/special.h"
-
-#include "memory_op/lgdt.h"
-#include "memory_op/movcr.h"
-

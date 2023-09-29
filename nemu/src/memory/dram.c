@@ -96,6 +96,10 @@ static void ddr3_write(hwaddr_t addr, void *data, uint8_t *mask) {
 	memcpy(dram[rank][bank][row], rowbufs[rank][bank].buf, NR_COL);
 }
 
+void call_ddr3_write(hwaddr_t addr, void *data, uint8_t *mask){
+	ddr3_write(addr,data,mask);
+}
+
 uint32_t dram_read(hwaddr_t addr, size_t len) {
 	uint32_t offset = addr & BURST_MASK;
 	uint8_t temp[2 * BURST_LEN];
@@ -108,6 +112,11 @@ uint32_t dram_read(hwaddr_t addr, size_t len) {
 	}
 
 	return unalign_rw(temp + offset, 4);
+}
+
+void call_ddr3_read(hwaddr_t addr, void *data){
+	//for cache.c
+	ddr3_read(addr,data);
 }
 
 void dram_write(hwaddr_t addr, size_t len, uint32_t data) {

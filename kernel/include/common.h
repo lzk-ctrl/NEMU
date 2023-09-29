@@ -27,4 +27,3 @@ typedef uint8_t bool;
 #endif
 
 #endif
-

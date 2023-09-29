@@ -1,95 +1,52 @@
-#include "memory/page.h"
-#include "nemu.h"
+
+#include "common.h"
+#include "memory/tlb.h"
+#include "burst.h"
+#include <time.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#define exp2(x) (1 << (x))
-#define mask_with_len(x) (exp2(x) - 1)
-
-hwaddr_t page_walk(lnaddr_t);
-
-typedef union {
-	struct {
-		uint32_t valid	:1;
-		uint32_t pad0	:11;
-		uint32_t vpn	:20;
-	};
-	uint32_t val;
-} TLBKey;
-
-/* TLB is fully associative */
-typedef struct {
-	int size;
-	int size_width;
-	TLBKey *key;
-	uint32_t *pte;
-} TLB;
-
-static TLB tlb;
-
-bool tlb_query(TLB *t, lnaddr_t lnaddr, int *idx) {
-	uint32_t key = (lnaddr & ~PAGE_MASK) | 0x1;
-	int i;
-
-	asm ("cld; repne scasl" : "=c"(i) : "a"(key), "D"(t->key), "c"(t->size + 1));
-	*idx = t->size - i;
-	if(*idx < t->size) {
-		return true;
-	}
-
-	/* TLB miss */
-	*idx = rand() & mask_with_len(t->size_width);		// victim TLB entry
-	return false;
+void init_tlb()
+{
+    int i;
+    for (i = 0; i < TLB_SIZE; i++)
+    {
+        tlb[i].valid = 0;
+    }
 }
 
-static uint32_t tlb_fetch(TLB *t, lnaddr_t lnaddr) {
-	int idx;
-#ifdef ENABLE_TLB
-
-   	bool b = tlb_query(t, lnaddr, &idx); 
-	if(b) {
-		/* TLB hit */
-		return idx;
-	}
-
-	/* TLB miss */
-
-#else
-	idx = 0;
-#endif
-	/* TLB fill */
-	t->key[idx].val = (lnaddr & ~PAGE_MASK) | 0x1;
-	
-	t->pte[idx] = page_walk(lnaddr);
-	return idx;
+int read_tlb(uint32_t addr)
+{
+    uint32_t dir = addr >> 12;
+    int i;
+    for (i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].tag == dir && tlb[i].valid == 1)
+        {
+            return i;
+        }
+    }
+    return -1;
 }
 
-uint32_t tlb_read(lnaddr_t lnaddr) {
-	
-	uint32_t idx = tlb_fetch(&tlb, lnaddr);
-	return tlb.pte[idx] & ~PAGE_MASK;
+void write_tlb(uint32_t lnaddr, uint32_t hwaddr)
+{
+    uint32_t dir = lnaddr >> 12;
+    uint32_t page = hwaddr >> 12;
+    int i;
+    for (i = 0; i < TLB_SIZE; i++)
+    {
+        if (!tlb[i].valid)
+        { //not in memory}
+            tlb[i].valid = 1;
+            tlb[i].tag = dir;
+            tlb[i].page_num = page;
+            return;
+        }
+    }
+    srand(time(0));
+    i = rand() % TLB_SIZE;
+    tlb[i].valid = 1;
+    tlb[i].tag = dir;
+    tlb[i].page_num = page;
 }
-
-static void init_tlb(TLB *t) {
-	int i;
-	for(i = 0; i < t->size; i ++) {
-		t->key[i].val = 0;
-	}
-}
-
-static void make_tlb(TLB *t, int size_width) {
-	t->size_width = size_width;
-	t->size = exp2(size_width);
-	t->key = malloc(sizeof(TLBKey) << size_width);
-	t->pte = malloc(sizeof(uint32_t) << size_width);
-}
-
-void make_all_tlb() {
-	make_tlb(&tlb, 6);
-}
-
-void init_all_tlb() {
-	//if(cpu.cr0.PG)Log("hello");
-	init_tlb(&tlb);
-}
-
-

@@ -1,178 +1,158 @@
 #include "common.h"
-#include "memory/cache.h"
+#include "burst.h"
 #include <stdlib.h>
-#define gr(group,group_index,offset)(this->cache_blocks+(group*this->associate + group_index)*this->block_size+offset)
+#include "memory/cache.h"
 
-uint64_t time_m=0;
-uint32_t dram_read(hwaddr_t,size_t);
-void dram_write(hwaddr_t,size_t,uint32_t);
+uint32_t dram_read(hwaddr_t addr, size_t len);
+void call_ddr3_read(hwaddr_t, void *);
+void call_ddr3_write(hwaddr_t, void *, uint8_t *);
 
-static uint32_t mask(int len){
-	if(len==1)  return 0xff;
-	else if(len==2) return 0xffff;
-	else return 0xffffffff;
+void init_cache()
+{
+    int i;
+    for (i = 0; i < CACHE_SIZE_L1 / CACHE_BLOCK_SIZE; i++)
+    {
+        cache[i].valid = false;
+        cache[i].tag = 0;
+        memset(cache[i].data, 0, CACHE_BLOCK_SIZE);
+    }
+    for (i = 0; i < CACHE_SIZE_L2 / CACHE_BLOCK_SIZE; i++)
+    {
+        cache2[i].valid = false;
+        cache2[i].dirty = false;
+        cache2[i].tag = 0;
+        memset(cache2[i].data, 0, CACHE_BLOCK_SIZE);
+    }
+    //tol_time = 0;
 }
 
-uint32_t read_cache(CACHE *this,uint32_t addr,int len){
-	uint32_t block_offset = addr % this ->block_size;
-	uint32_t block = addr/this->block_size;
-	uint32_t group = block % (this->size / this->block_size / this->associate);
-	uint32_t tag = block / (this->size / this->block_size / this->associate);
-	int i;
-	if (block_offset + len > this->block_size){
-		uint32_t res=0;
-		
-		for(i=len-1;i>=0;--i){
-			uint32_t ret=read_cache(this,addr+i,1);
-			res=(res<<8)|ret;
-		}
-		return res;
-	}
-
-	for(i=0;i < this -> associate;++i){
-		if(this->valid[group * this->associate +1] && this->tags[group * this->associate +i] ==tag){
-		time_m+=2;
-
-		return (*(uint32_t *)(void *)gr(group,i,block_offset)) & mask(len);
-		}
-	}
-
-	time_m+=200;
-	int j=0;
-	i = rand() %this->associate;
-	if( this ->valid[group * this->associate +i]){
-		uint32_t local_block=0;
-		local_block=(this -> tags[group*this -> associate +i]*(this->size / this->block_size / this->associate))|group;
-		for(j=0;j< this->block_size ; ++j){
-			dram_write(local_block * this->block_size + j,1, *gr(group,i,j));
-		}
-	}
-	
-	for(j=0;j < this->block_size; ++j){
-		*(uint8_t *)(void *)gr(group,i,j) = dram_read(block * this->block_size + j,i);
-	}
-	this ->tags[group * this ->associate + i] = tag;
-	this ->valid[group * this ->associate + i]=1;
-	return *(uint32_t *)(void *)gr(group,i,block_offset) & mask(len);
+uint32_t cache_read(hwaddr_t addr)
+{
+    uint32_t gid = (addr >> 6) & 0x7f; //get group number
+    bool hit = false;
+    int i;
+    for (i = gid * EIGHT_WAY; i < (gid + 1) * EIGHT_WAY; i++)
+    {
+        if (cache[i].tag == (addr >> 13) && cache[i].valid)
+        {
+            hit = true; //hit
+            //printf("hit!");
+            //tol_time += 2;
+            break;
+        }
+    }
+    if (!hit)
+    { //not hit
+        int j = second_cache_read(addr);
+        for (i = gid * EIGHT_WAY; i < (gid + 1) * EIGHT_WAY; i++)
+        {
+            if (!cache[i].valid)
+                break; //find cache[i].valid=0;
+        }
+        if (i == (gid + 1) * EIGHT_WAY)
+        {
+            //random replacement algorism
+            srand(0);
+            i = gid * EIGHT_WAY + rand() % EIGHT_WAY;
+        }
+        cache[i].valid = true;
+        cache[i].tag = addr >> 13;
+        memcpy(cache[i].data, cache2[j].data, CACHE_BLOCK_SIZE);
+    }
+    return i;
 }
 
-
-void write_cache(CACHE *this, uint32_t addr,int len,uint32_t data){
-	time_m+=200;
-	int j = 0;
-	uint32_t block_offset=addr % this->block_size;
-	uint32_t block = addr / this->block_size;
-	uint32_t group = block % (this->size / this->block_size / this ->associate);
-	uint32_t tag = block / (this->size / this ->block_size / this->associate);
-
-
-	int i;
-	if(block_offset + len > this ->block_size){
-		uint32_t temp = data;
-		for(i=0;i<len;++i){
-			write_cache(this,addr+i,1,temp & 0xff);
-			temp >>=8;
-		}
-		return;
-	}
-
-	for(i=0; i < this->associate; ++i){
-		if(this->valid[group * this->associate+i] && this->tags[group * this->associate + i] ==tag){
-			int k=0;
-			for(k = 0;k < len;++k){
-				*(uint8_t *)(void *)gr(group,i,block_offset + k) = (uint8_t)(data & 0xff);
-				data >>= 8;
-			}
-
-			for(j=0;j <this->block_size ; ++j){
-				dram_write(block * this->block_size + j,1 ,*gr(group,i,j));
-			}
-
-		return;
-		dram_write((uint64_t)(void *) gr(group,i,block_offset), len,data);
-		}
-	}
-
-	i = rand() % this->associate;
-	if (this->valid[group * this->associate + i]){
-		uint32_t local_block=0;
-        	local_block=(this->tags[group*this->associate+i]*(this->size / this->block_size / this->associate))|group;
-		for (j = 0; j < this->block_size; ++j){
-			dram_write(local_block * this->block_size + j, 1, *gr(group, i, j));
-        	}
-	}
-
-
-
-	for (j = 0; j < this->block_size; ++j){
-
-		*(uint8_t *)(void *)gr(group, i, j) = dram_read(block * this->block_size + j, 1);
-	}
-	this->tags[group * this->associate + i] = tag;
-	this->valid[group * this->associate + i] = 1;
-	int k = 0;
-	for (k = 0; k < len; ++k){
-		*(uint8_t *)(void *)gr(group, i, block_offset + k) = (uint8_t)(data & 0xff);
-		data >>= 8;
-	}
-	for (j = 0; j < this->block_size; ++j){
-
-		dram_write(block * this->block_size + j, 1, *gr(group, i, j));
-	}
-	return;
+uint32_t second_cache_read(hwaddr_t addr)
+{
+    uint32_t gid = (addr >> 6) & ((1 << 12) - 1); //get group number
+    uint32_t block = (addr >> 6) << 6;
+    int i;
+    bool hit = false;
+    for (i = gid * SIXTEEN_WAY; i < (gid + 1) * SIXTEEN_WAY; i++)
+    {
+        if (cache2[i].tag == (addr >> 18) && cache2[i].valid)
+        {
+            //hit
+            hit = true;
+            //printf("hit!");
+            //tol_time += 20;
+            break;
+        }
+    }
+    if (!hit)
+    {
+        //not hit
+        int j;
+        for (i = gid * SIXTEEN_WAY; i < (gid + 1) * SIXTEEN_WAY; i++)
+        {
+            if (!cache2[i].valid)
+                break;
+        }
+        if (i == (gid + 1) * SIXTEEN_WAY)
+        {
+            srand(0);
+            i = gid * SIXTEEN_WAY + rand() % SIXTEEN_WAY;
+            if (cache2[i].dirty)
+            {
+                uint8_t mask[BURST_LEN * 2];
+                memset(mask, 1, BURST_LEN * 2);
+                for (j = 0; j < CACHE_BLOCK_SIZE / BURST_LEN; j++)
+                {
+                    call_ddr3_write(block + j * BURST_LEN, cache2[i].data + j * BURST_LEN, mask);
+                }
+            }
+        }
+        cache2[i].valid = true;
+        cache2[i].tag = addr >> 18;
+        cache2[i].dirty = false;
+        for (j = 0; j < BURST_LEN; j++)
+        {
+            call_ddr3_read(block + j * BURST_LEN, cache2[i].data + j * BURST_LEN);
+        }
+        //tol_time += 200;
+    }
+    return i;
 }
 
-
-
-
-void init_cache(){
-
-	int bs = 64, sz = 64 * 1024, ass = 8;
-	L1_cache.cache_blocks = malloc(sz);
-	L1_cache.tags = malloc((sz / bs) * 4);
-	L1_cache.valid = malloc(sz / bs);
-	memset(L1_cache.valid, 0, sz / bs);
-	L1_cache.block_size = bs;
-	L1_cache.size = sz;
-	L1_cache.associate = ass;
-	L1_cache.next = NULL;
+void cache_write(hwaddr_t addr, size_t len, uint32_t data)
+{
+    uint32_t gid = (addr >> 6) & 0x7f;
+    uint32_t offset = addr & (CACHE_BLOCK_SIZE - 1); //displacement addr
+    int i;
+    bool hit = false;
+    for (i = gid * EIGHT_WAY; i < (gid + 1) * EIGHT_WAY; i++)
+    {
+        if (cache[i].tag == (addr >> 13) && cache[i].valid)
+        {
+            hit = true;
+            break;
+        }
+    }
+    if (hit)
+    {
+        memcpy(cache[i].data + offset, &data, len);
+    }
+    second_cache_write(addr, len, data);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void second_cache_write(hwaddr_t addr, size_t len, uint32_t data)
+{
+    uint32_t gid = (addr >> 6) & ((1 << 12) - 1);
+    uint32_t offset = addr & (CACHE_BLOCK_SIZE - 1);
+    bool hit = false;
+    int i;
+    for (i = gid * SIXTEEN_WAY; i < (gid + 1) * SIXTEEN_WAY; i++)
+    {
+        if (cache2[i].tag == (addr >> 13) && cache2[i].valid)
+        {
+            hit = true;
+            break;
+        }
+    }
+    if (!hit)
+    {
+        i = second_cache_read(addr);
+    }
+    cache2[i].dirty = true;
+    memcpy(cache2[i].data + offset, &data, len);
+}

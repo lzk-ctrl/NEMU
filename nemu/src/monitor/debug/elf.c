@@ -8,6 +8,23 @@ static char *strtab = NULL;
 static Elf32_Sym *symtab = NULL;
 static int nr_symtab_entry;
 
+uint32_t getVariable(char* name)
+{
+	int i;
+	for (i = 0; i < nr_symtab_entry; i++)
+	{
+    	if ((symtab[i].st_info & 0xf) == STT_OBJECT)
+		{
+    		char ls[50];
+    		strcpy(ls, strtab + symtab[i].st_name);
+    		if (strcmp(ls, name) == 0)
+        		return symtab[i].st_value;
+    	}
+	}
+	return 0;
+}
+
+
 void load_elf_tables(int argc, char *argv[]) {
 	int ret;
 	Assert(argc == 2, "run NEMU with format 'nemu [program]'");
@@ -80,33 +97,3 @@ void load_elf_tables(int argc, char *argv[]) {
 
 	fclose(fp);
 }
-
-uint32_t findSymbol(char* args,int len)
-{
-	int i;
-	for(i=0;i<nr_symtab_entry;++i)
-	{
-		if(!strncmp(args,strtab + symtab[i].st_name,len))
-			return symtab[i].st_value;
-	}
-	return 0;
-}
-
-
-char* findFunctionName(uint32_t eip)
-{
-	int i;
-	int idx=0;
-	for(i=0;i<nr_symtab_entry;++i)
-		if(symtab[i].st_info == 18)
-			if(symtab[i].st_value<=eip&&symtab[i].st_value>symtab[idx].st_value)
-				idx=i;
-	if(!idx)
-		return NULL;
-	return strtab+symtab[idx].st_name;
-}
-
-
-
-
-

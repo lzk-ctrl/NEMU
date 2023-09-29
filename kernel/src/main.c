@@ -1,5 +1,6 @@
 #include "common.h"
 #include "memory.h"
+
 void init_page();
 void init_serial();
 void init_ide();
@@ -107,5 +108,4 @@ void init_cond() {
 
 	panic("should not reach here");
 }
-
 

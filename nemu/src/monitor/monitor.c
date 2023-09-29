@@ -2,13 +2,12 @@
 #include "memory/cache.h"
 
 #define ENTRY_START 0x100000
-void make_all_tlb();
 
-extern CACHE L1_cache;
-extern uint8_t entry [];
+extern uint8_t entry[];
 extern uint32_t entry_len;
 extern char *exec_file;
 
+void init_tlb();
 void load_elf_tables(int, char *[]);
 void init_regex();
 void init_wp_pool();
@@ -16,84 +15,108 @@ void init_ddr3();
 
 FILE *log_fp = NULL;
 
-static void init_log() {
-	log_fp = fopen("log.txt", "w");
-	Assert(log_fp, "Can not open 'log.txt'");
+static void init_log()
+{
+    log_fp = fopen("log.txt", "w");
+    Assert(log_fp, "Can not open 'log.txt'");
 }
 
-static void welcome() {
-	printf("Welcome to NEMU!\nThe executable is %s.\nFor help, type \"help\"\n",
-			exec_file);
+static void welcome()
+{
+    printf("Welcome to NEMU!\nThe executable is %s.\nFor help, type \"help\"\n",
+           exec_file);
 }
 
-void init_monitor(int argc, char *argv[]) {
-	/* Perform some global initialization */
+static void init_eflags()
+{ //³õÊ¼»¯eflags¼Ä´æÆ÷
+    cpu.eflags.val = 2;
+}
 
-	/* Open the log file. */
-	init_log();
+void init_monitor(int argc, char *argv[])
+{
+    /* Perform some global initialization */
 
-	/* Load the string table and symbol table from the ELF file for future use. */
-	load_elf_tables(argc, argv);
+    /* Open the log file. */
+    init_log();
 
-	/* Compile the regular expressions. */
-	init_regex();
+    /* Load the string table and symbol table from the ELF file for future use. */
+    load_elf_tables(argc, argv);
 
-	/* Initialize the watchpoint pool. */
-	init_wp_pool();
-	make_all_tlb();
+    /* Compile the regular expressions. */
+    init_regex();
 
-	/* Display welcome message. */
-	welcome();
+    /* Initialize the watchpoint pool. */
+    init_wp_pool();
+
+    /* Display welcome message. */
+    welcome();
 }
 
 #ifdef USE_RAMDISK
-static void init_ramdisk() {
-	int ret;
-	const int ramdisk_max_size = 0xa0000;
-	FILE *fp = fopen(exec_file, "rb");
-	Assert(fp, "Can not open '%s'", exec_file);
+static void init_ramdisk()
+{
+    int ret;
+    const int ramdisk_max_size = 0xa0000;
+    FILE *fp = fopen(exec_file, "rb");
+    Assert(fp, "Can not open '%s'", exec_file);
 
-	fseek(fp, 0, SEEK_END);
-	size_t file_size = ftell(fp);
-	Assert(file_size < ramdisk_max_size, "file size(%zd) too large", file_size);
+    fseek(fp, 0, SEEK_END);
+    size_t file_size = ftell(fp);
+    Assert(file_size < ramdisk_max_size, "file size(%zd) too large", file_size);
 
-	fseek(fp, 0, SEEK_SET);
-	ret = fread(hwa_to_va(0), file_size, 1, fp);
-	assert(ret == 1);
-	fclose(fp);
+    fseek(fp, 0, SEEK_SET);
+    ret = fread(hwa_to_va(0), file_size, 1, fp);
+    assert(ret == 1);
+    fclose(fp);
 }
 #endif
 
-static void load_entry() {
-	int ret;
-	FILE *fp = fopen("entry", "rb");
-	Assert(fp, "Can not open 'entry'");
+static void load_entry()
+{
+    int ret;
+    FILE *fp = fopen("entry", "rb");
+    Assert(fp, "Can not open 'entry'");
 
-	fseek(fp, 0, SEEK_END);
-	size_t file_size = ftell(fp);
+    fseek(fp, 0, SEEK_END);
+    size_t file_size = ftell(fp);
 
-	fseek(fp, 0, SEEK_SET);
-	ret = fread(hwa_to_va(ENTRY_START), file_size, 1, fp);
-	assert(ret == 1);
-	fclose(fp);
+    fseek(fp, 0, SEEK_SET);
+    ret = fread(hwa_to_va(ENTRY_START), file_size, 1, fp);
+    assert(ret == 1);
+    fclose(fp);
 }
 
-void restart() {
-	/* Perform some initialization to restart a program */
+static void init_cr0()
+{
+    cpu.cr0.protect_enable = 0;
+    cpu.cr0.paging = 0;
+}
+
+static void init_cs()
+{
+    cpu.cs.base = 0;
+    cpu.cs.limit = 0xffffffff;
+}
+
+void restart()
+{
+    init_eflags();
+    init_tlb();
+    init_cache();
+    init_cr0();
+    init_cs();
+    /* Perform some initialization to restart a program */
 #ifdef USE_RAMDISK
-	/* Read the file with name `argv[1]' into ramdisk. */
-	init_ramdisk();
+    /* Read the file with name `argv[1]' into ramdisk. */
+    init_ramdisk();
 #endif
 
-	/* Read the entry code into memory. */
-	load_entry();
+    /* Read the entry code into memory. */
+    load_entry();
 
-	/* Set the initial instruction pointer. */
-	cpu.eflags.val=2;
-	cpu.eip = ENTRY_START;
-	cpu.cr0.val=0x0;
+    /* Set the initial instruction pointer. */
+    cpu.eip = ENTRY_START;
 
-	/* Initialize DRAM. */
-	init_ddr3();
-	L1_cache.state=0;
+    /* Initialize DRAM. */
+    init_ddr3();
 }
