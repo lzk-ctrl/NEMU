@@ -1,10 +1,18 @@
 #include "cpu/exec/helper.h"
 
-make_helper(push)
-{
-    uint32_t a = reg_l(instr_fetch(eip, 1) & 7);
-    cpu.esp -= 4;
-    swaddr_write(cpu.esp, 4, a, R_SS);
-    print_asm("push\t%%%s", regsl[instr_fetch(cpu.eip, 1) & 7]);
-    return 1;
-}
+#define DATA_BYTE 1
+#include "push-template.h"
+#undef DATA_BYTE
+
+#define DATA_BYTE 2
+#include "push-template.h"
+#undef DATA_BYTE
+
+#define DATA_BYTE 4
+#include "push-template.h"
+#undef DATA_BYTE
+
+
+make_helper_v(push_r)
+make_helper_v(push_rm)
+make_helper_v(push_i)

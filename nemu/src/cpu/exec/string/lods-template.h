@@ -1,16 +1,19 @@
 #include "cpu/exec/template-start.h"
 
 #define instr lods
-
-make_helper(concat(lods_n_, SUFFIX))
+make_helper(concat(lods_, SUFFIX))
 {
-    cpu.eax = swaddr_read(cpu.esi, DATA_BYTE, 2);
-    if (cpu.eflags.DF == 0)
-    {
-        cpu.esi += DATA_BYTE;
-    }
-    else
-        cpu.esi -= DATA_BYTE;
-    return 1;
+	REG(R_EAX) = swaddr_read(reg_l(R_ESI), DATA_BYTE);
+	if (cpu.eflags.DF == 0)
+	{
+		reg_l(R_ESI) += DATA_BYTE;
+	}
+	else
+	{
+		reg_l(R_ESI) -= DATA_BYTE;
+	}
+		print_asm("lods" str(SUFFIX) " %%ds:(%%esi),%%es:(%%al)");
+	return 1;
 }
+
 #include "cpu/exec/template-end.h"

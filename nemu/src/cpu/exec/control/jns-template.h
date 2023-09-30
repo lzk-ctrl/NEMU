@@ -2,12 +2,13 @@
 
 #define instr jns
 
-static void do_execute(){
-    DATA_TYPE_S imm = op_src->val;
-    print_asm("jns\t%x", cpu.eip + 1 + DATA_BYTE + imm);
-    if(cpu.eflags.SF == 0)cpu.eip += imm;
-}
 
+static void do_execute() {
+	DATA_TYPE_S displacement = op_src->val;
+	print_asm("jns %x",cpu.eip + 1 + DATA_BYTE + displacement);
+	if (cpu.eflags.SF == 0)cpu.eip +=displacement;
+}
 make_instr_helper(i)
+
 
 #include "cpu/exec/template-end.h"

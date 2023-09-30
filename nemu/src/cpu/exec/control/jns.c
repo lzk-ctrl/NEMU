@@ -12,4 +12,5 @@
 #include "jns-template.h"
 #undef DATA_BYTE
 
+
 make_helper_v(jns_i)
