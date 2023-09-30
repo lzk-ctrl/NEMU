@@ -62,3 +62,5 @@
 
 #include "special/special.h"
 
+#include "control/std.h"
+#include "control/cld.h"
