@@ -49,7 +49,9 @@ void sreg_set(uint8_t id)
 	sreg_info.p1 = lnaddr_read(chart_addr, 4);
 	sreg_info.p2 = lnaddr_read(chart_addr + 4, 4);
 	cpu.sreg[id].base = sreg_info.b1 + (sreg_info.b2 << 16) + (sreg_info.b3 << 24);
-cpu.sreg[id].limit = sreg_info.lim1 + (sreg_info.lim2 << 16) + ((uint32_t)0xfff << 24);
+	cpu.sreg[id].limit = sreg_info.lim1 + (sreg_info.lim2 << 16) + ((uint32_t)0xfff << 24);
+
+
 	if (sreg_info.g == 1)
 	{
 		cpu.sreg[id].limit <<= 12;

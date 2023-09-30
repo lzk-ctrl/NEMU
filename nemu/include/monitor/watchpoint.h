@@ -3,13 +3,18 @@
 
 #include "common.h"
 
-typedef struct watchpoint {
+typedef struct watchpoint
+{
 	int NO;
 	struct watchpoint *next;
-
+	char EXPR[32];
+	int val;
 	/* TODO: Add more members if necessary */
-	char exprs[32];
-	int	old_value;
-} WP;
 
+} WP;
+WP *new_wp(char *, bool *);
+WP *find_wp(char *);
+void free_wp(WP *);
+bool check_wp();
+void print_wp();
 #endif

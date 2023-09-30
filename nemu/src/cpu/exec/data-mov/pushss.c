@@ -1,16 +1,15 @@
 #include "cpu/exec/helper.h"
 
 #define DATA_BYTE 1
-#include "jnle-template.h"
+#include "pushss-template.h"
 #undef DATA_BYTE
 
 #define DATA_BYTE 2
-#include "jnle-template.h"
+#include "pushss-template.h"
 #undef DATA_BYTE
 
 #define DATA_BYTE 4
-#include "jnle-template.h"
+#include "pushss-template.h"
 #undef DATA_BYTE
 
-
-make_helper_v(jnle_i)
+make_helper_v(pushss_si)

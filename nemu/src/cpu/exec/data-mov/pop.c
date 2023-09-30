@@ -1,14 +1,9 @@
 #include "cpu/exec/helper.h"
 
-#define DATA_BYTE 2
-#include "pop-template.h"
-#undef DATA_BYTE
-
-#define DATA_BYTE 4
-#include "pop-template.h"
-#undef DATA_BYTE
-
-
-
-make_helper_v(pop_rm)
-make_helper_v(pop_r)
+make_helper(pop)
+{
+    reg_l(instr_fetch(cpu.eip, 1) & 7) = swaddr_read(cpu.esp, 4, R_SS);
+    cpu.esp += 4;
+    print_asm("pop\t%%%s", regsl[instr_fetch(cpu.eip, 1) & 7]);
+    return 1;
+}
