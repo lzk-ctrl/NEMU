@@ -64,3 +64,4 @@
 
 #include "control/std.h"
 #include "control/cld.h"
+#include "data-mov/lgdt.h"
